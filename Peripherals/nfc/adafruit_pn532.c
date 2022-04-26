@@ -34,7 +34,8 @@
 #endif
 
 #ifndef TAG_DETECT_TIMEOUT
-#define TAG_DETECT_TIMEOUT 10000
+#define TAG_DETECT_TIMEOUT  4000
+#define SHORT_TIMEOUT       500
 #endif
 
 #ifndef PN532_IRQ
@@ -594,14 +595,14 @@ ret_code_t adafruit_pn532_in_data_exchange(uint8_t * p_send,
 
     ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
                                                   send_len + 2,
-                                                  10000);
+                                                  TAG_DETECT_TIMEOUT);
     if (err_code != STM_SUCCESS)
     {
         return err_code;
     }
 
     // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
-    if (!adafruit_pn532_waitready_ms(10000))
+    if (!adafruit_pn532_waitready_ms(TAG_DETECT_TIMEOUT))
     {
         return NFC_TIME_OUT;
     }
@@ -792,7 +793,7 @@ ret_code_t adafruit_pn532_ack_read(void)
     }
 
     // Wait for irq to be taken off.
-    for (uint16_t i = 0; i < 1000; i++)
+    for (uint16_t i = 0; i < SHORT_TIMEOUT; i++)
     {
         if (!adafruit_pn532_is_ready())
         {
@@ -946,7 +947,7 @@ static ret_code_t adafruit_pn532_field_switch(uint8_t field_conf)
 
     err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
                                        COMMAND_RFCONFIGURATION_RFFIELD_LENGTH,
-                                       1000);
+                                       SHORT_TIMEOUT);
     if (err_code != STM_SUCCESS)
     {
         return err_code;
@@ -957,6 +958,101 @@ static ret_code_t adafruit_pn532_field_switch(uint8_t field_conf)
         return NFC_TIME_OUT;
     }
 
+    return STM_SUCCESS;
+}
+
+ret_code_t adafruit_pn532_deselect() {
+    m_pn532_packet_buf[0] = PN532_COMMAND_INDESELECT;
+    m_pn532_packet_buf[1] = 0x00;
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  2,
+                                                  SHORT_TIMEOUT);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
+    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    {
+        return NFC_TIME_OUT;
+    }
+
+    err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        2 + REPLY_INDATAEXCHANGE_BASE_LENGTH);
+    // + 2 for command and status byte
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    uint8_t length = 0;
+    err_code = adafruit_pn532_header_check(m_pn532_packet_buf, &length);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if ( (m_pn532_packet_buf[PN532_TFI_OFFSET] != PN532_PN532TOHOST) ||
+         (m_pn532_packet_buf[PN532_DATA_OFFSET] != PN532_COMMAND_INDESELECT + 1) )
+    {
+        return NFC_EXCHANGE_DIR_ERROR;
+    }
+
+    // Check InDataExchange Status byte.
+    if ((m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK) != 0x00)
+    {
+        return PN532_ERROR_BASE + (m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK);
+    }
+    return STM_SUCCESS;
+}
+
+
+ret_code_t adafruit_pn532_release() {
+    m_pn532_packet_buf[0] = PN532_COMMAND_INRELEASE;
+    m_pn532_packet_buf[1] = 0x00;
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  2,
+                                                  SHORT_TIMEOUT);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
+    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    {
+        return NFC_TIME_OUT;
+    }
+
+    err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        2 + REPLY_INDATAEXCHANGE_BASE_LENGTH);
+    // + 2 for command and status byte
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    uint8_t length = 0;
+    err_code = adafruit_pn532_header_check(m_pn532_packet_buf, &length);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if ( (m_pn532_packet_buf[PN532_TFI_OFFSET] != PN532_PN532TOHOST) ||
+         (m_pn532_packet_buf[PN532_DATA_OFFSET] != PN532_COMMAND_INRELEASE + 1) )
+    {
+        return NFC_EXCHANGE_DIR_ERROR;
+    }
+
+    // Check InDataExchange Status byte.
+    if ((m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK) != 0x00)
+    {
+        return PN532_ERROR_BASE + (m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK);
+    }
     return STM_SUCCESS;
 }
 
@@ -976,6 +1072,168 @@ void adafruit_pn532_clear_buffers(void)
 {
     memset(m_pn532_packet_buf, 0, sizeof(m_pn532_packet_buf));
     memset(m_pn532_rxtx_buffer, 0, sizeof(m_pn532_rxtx_buffer));
+}
+
+ret_code_t adafruit_diagnose_comm_line(uint8_t * p_send, uint8_t send_len)
+{
+    uint8_t p_response_len = send_len + 1;
+    if ((uint16_t) send_len + 2 > PN532_PACKBUFF_SIZE)
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    // Prepare command.
+    m_pn532_packet_buf[0] = PN532_COMMAND_DIAGNOSE;
+    m_pn532_packet_buf[1] = 0x00;       ///< 0x00 NumTst value for communication line test between host controller and the PN532
+    memcpy(m_pn532_packet_buf + 2, p_send, send_len);
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  send_len + 2,
+                                                  SHORT_TIMEOUT);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
+    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        p_response_len + REPLY_INDATAEXCHANGE_BASE_LENGTH);
+    // + 2 for command and status byte
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    uint8_t length = 0;
+    err_code = adafruit_pn532_header_check(m_pn532_packet_buf, &length);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if ( (m_pn532_packet_buf[PN532_TFI_OFFSET] != PN532_PN532TOHOST) ||
+         (m_pn532_packet_buf[PN532_DATA_OFFSET] != PN532_COMMAND_DIAGNOSE + 1) )
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    // Compare response data with original data.
+    if (memcmp(m_pn532_packet_buf + PN532_DATA_OFFSET + 2, p_send, send_len) != 0x00)
+    {
+        return 11;
+    }
+
+    return STM_SUCCESS;
+}
+
+ret_code_t adafruit_diagnose_card_presence()
+{
+    uint8_t p_response_len = 1;
+
+    // Prepare command.
+    m_pn532_packet_buf[0] = PN532_COMMAND_DIAGNOSE;
+    m_pn532_packet_buf[1] = 0x06;       ///< 0x06 NumTst value for Card presence detection check
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  2,
+                                                  SHORT_TIMEOUT);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
+    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        p_response_len + REPLY_INDATAEXCHANGE_BASE_LENGTH);
+    // + 2 for command and status byte
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    uint8_t length = 0;
+    err_code = adafruit_pn532_header_check(m_pn532_packet_buf, &length);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if ( (m_pn532_packet_buf[PN532_TFI_OFFSET] != PN532_PN532TOHOST) ||
+         (m_pn532_packet_buf[PN532_DATA_OFFSET] != PN532_COMMAND_DIAGNOSE + 1) )
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    // Check status byte.
+    if ((m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK) != 0x00)
+    {
+        return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
+    }
+
+    return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
+}
+
+ret_code_t adafruit_diagnose_self_antenna(uint8_t threshold)
+{
+    uint8_t p_response_len = 1;
+
+    // Prepare command.
+    m_pn532_packet_buf[0] = PN532_COMMAND_DIAGNOSE;
+    m_pn532_packet_buf[1] = 0x07;       ///< 0x07 NumTst value for Self antenna detection
+    m_pn532_packet_buf[2] = threshold;
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  3,
+                                                  SHORT_TIMEOUT);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
+    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        p_response_len + REPLY_INDATAEXCHANGE_BASE_LENGTH);
+    // + 2 for command and status byte
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    uint8_t length = 0;
+    err_code = adafruit_pn532_header_check(m_pn532_packet_buf, &length);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if ( (m_pn532_packet_buf[PN532_TFI_OFFSET] != PN532_PN532TOHOST) ||
+         (m_pn532_packet_buf[PN532_DATA_OFFSET] != PN532_COMMAND_DIAGNOSE + 1) )
+    {
+        return STM_ERROR_INTERNAL;
+    }
+
+    // Check status byte
+    if ((m_pn532_packet_buf[PN532_DATA_OFFSET + 1] & PN532_STATUS_ERROR_MASK) != 0x00)
+    {
+        return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
+    }
+
+    return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
 }
 
 #endif // ADAFRUIT_PN532_ENABLED

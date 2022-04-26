@@ -18,7 +18,7 @@ typedef enum {
 	COMM_OK,
 	COMM_BUSY,
 	COMM_ERR
-}comStatus_t;
+} comStatus_t;
 
 typedef enum {
     BSP_OK,
@@ -28,6 +28,9 @@ typedef enum {
     BSP_MPU_BOARD_ERR,
     BSP_FLASH_ERR,
     BSP_FLASH_CHECK_ERR,
+    BSP_USB_ERR,
+    BSP_TIMEOUT_ERR,
+    BSP_BUSY_ERR,
 } BSP_Status_t;
 
 typedef enum
@@ -159,6 +162,8 @@ void BSP_App_Timer_Run(void);
 void BSP_App_Timer_Stop(uint8_t TimerId);
 
 void BSP_reset(void);
+void BSP_sysClkDisable(void);
+uint32_t read_hw_gpio_config();
 #define IVT_OFFSET 0x10000
 #ifdef __cplusplus
 }

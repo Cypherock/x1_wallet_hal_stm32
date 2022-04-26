@@ -342,7 +342,7 @@ static void ep_deconfig(uint8_t ep) {
 }
 
 static int32_t ep_read(uint8_t ep, void* buf, uint16_t blen) {
-    uint32_t len, tmp;
+    uint32_t len, tmp = 0;
     ep &= 0x7F;
     volatile uint32_t *fifo = EPFIFO(0);
     USB_OTG_OUTEndpointTypeDef* epo = EPOUT(ep);

@@ -27,7 +27,7 @@ void SystemClock_Config(void)
 	  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
 	  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 	  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-	  SCB->VTOR = APPLICATION_ADDRESS_BASE;
+	  SCB->VTOR = FIRMWARE_START_ADDRESS;
 	  /** Initializes the RCC Oscillators according to the specified parameters
 	  * in the RCC_OscInitTypeDef structure.
 	  */
@@ -939,3 +939,24 @@ void BSP_DebugPort_Write(uint8_t * data, uint8_t size){
     lusb_write(data, size);
 }
 
+
+void BSP_sysClkDisable(void)
+{
+	SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
+}
+
+uint32_t read_hw_gpio_config()
+{
+	__HAL_RCC_GPIOC_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = BSP_JOYSTICK_LEFT_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(BSP_JOYSTICK_GPIO_PORT, &GPIO_InitStruct);
+
+    if (HAL_GPIO_ReadPin(BSP_JOYSTICK_GPIO_PORT, BSP_JOYSTICK_LEFT_PIN) == GPIO_PIN_SET) {
+        return DEVICE_HARDWARE_STM32_2;
+    } else {
+        return DEVICE_HARDWARE_STM32_3;
+    }
+}

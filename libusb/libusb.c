@@ -20,9 +20,7 @@
 #include "usb.h"
 #include "usb_cdc.h"
 #include "sdk_config.h"
-#include "communication.h"
-#include "utils.h"
-#include "logger.h"
+#include "libusb.h"
 
 #define CDC_EP0_SIZE    0x08
 #define CDC_RXD_EP      0x01
@@ -35,6 +33,10 @@
 
 #define LU_RX_PKT_BUF_COUNT     3
 #define LU_TX_PKT_BUF_COUNT     3
+
+// Bootloader takes upto 128 byte payloads while application takes about 88 bytes long payload
+#define BYTE_STUFFED_DATA_SIZE                 128
+
 #define LU_RX_BUF_SIZE          (BYTE_STUFFED_DATA_SIZE * LU_RX_PKT_BUF_COUNT)
 #define LU_TX_BUF_SIZE          (BYTE_STUFFED_DATA_SIZE * LU_TX_PKT_BUF_COUNT)
 
@@ -46,6 +48,8 @@
 #else
 #define CDC_PROTOCOL USB_PROTO_NONE
 #endif
+
+libusb_parser_fptr_t parseFun;
 
 /* Declaration of the report descriptor */
 struct cdc_config {
@@ -191,21 +195,6 @@ uint32_t	ubuf[0x20];
 uint8_t     fifo[LU_TX_BUF_SIZE];
 uint8_t     rx_buffer[LU_RX_BUF_SIZE];
 uint32_t    fpos = 0;
-uint32_t    rpos = 0;
-
-typedef enum packet_states {
-    WAIT4_SOF,              ///< Can be 0xAA or 0x5A for v0 & v1 respectively @see START_OF_FRAME, START_OF_FRAME_U16
-    WAIT4_SOF_V1,           ///< Should be 0x5A
-    WAIT4_CMD1,             ///< Highest order of byte
-    WAIT4_CMD2,             ///< 3rd highest order of byte
-    WAIT4_CMD3,             ///< 2nd highest order of byte
-    WAIT4_CMD4,             ///< Lowest order of byte
-    WAIT4_PKT_LEN,          ///< Length of current packet
-    WAIT4_PAYLOAD,          ///< Payload of current packet
-    WAIT4_CHECKSUM1,        ///< High order byte of CRC-16
-    WAIT4_CHECKSUM2,        ///< Low order byte of CRC-16
-    WAIT4_PKT_PROCESS,      ///< Wait for application to process the packet
-} packet_states;
 
 static struct usb_cdc_line_coding cdc_line = {
     .dwDTERate          = 38400,
@@ -268,73 +257,10 @@ static usbd_respond cdc_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_cal
 
 
 static void cdc_rxonly (usbd_device *dev, uint8_t event, uint8_t ep) {
-    static packet_states state = WAIT4_SOF;
-    static uint8_t rec_buffer[BYTE_STUFFED_DATA_SIZE + COMM_HEADER_SIZE] = {0};
-    static uint8_t rec_counter = 0, payload_size = 0;
-
     uint32_t dataSize = usbd_ep_read(dev, ep, rx_buffer, LU_RX_BUF_SIZE);
-    for (int i = 0; i < dataSize; i++) {
-        uint8_t byte = rx_buffer[i];
-        switch (state) {
-            case WAIT4_SOF:
-                payload_size = 0;
-                rec_counter = 0;
-                if (byte == (START_OF_FRAME_U16 >> 8 & 0x00FF))
-                    state = WAIT4_SOF_V1;
-                else if (byte == START_OF_FRAME)
-                    state = WAIT4_CMD4;
-                break;
-            case WAIT4_SOF_V1:
-                if (byte == (START_OF_FRAME_U16 & 0xFF))
-                    state = WAIT4_CMD1;
-                else
-                    state = WAIT4_SOF;
-                break;
-            case WAIT4_CMD1:
-                state = WAIT4_CMD2;
-                break;
-            case WAIT4_CMD2:
-                state = WAIT4_CMD3;
-                break;
-            case WAIT4_CMD3:
-                state = WAIT4_CMD4;
-                break;
-            case WAIT4_CMD4:
-                state = WAIT4_PKT_LEN;
-                break;
-            case WAIT4_PKT_LEN:
-                payload_size = byte - 2;
-                if (byte > BYTE_STUFFED_DATA_SIZE)
-                    state = WAIT4_SOF;
-                else
-                    state = WAIT4_PAYLOAD;
-                break;
-            case WAIT4_PAYLOAD:
-                if (--payload_size == 0)
-                    state = WAIT4_CHECKSUM1;
-                break;
-            case WAIT4_CHECKSUM1:
-                state = WAIT4_CHECKSUM2;
-                break;
-            case WAIT4_CHECKSUM2:
-                state = WAIT4_PKT_PROCESS;
-                break;
-            case WAIT4_PKT_PROCESS:
-                receive_packet_parser(rec_buffer, rec_counter);
-                state = WAIT4_SOF;
-                i--;
-                break;
-            default:
-                state = WAIT4_SOF;
-                break;
-        }
-        rec_buffer[rec_counter++] = byte;
-        if (state == WAIT4_PKT_PROCESS) {
-            receive_packet_parser(rec_buffer, rec_counter);
-            state = WAIT4_SOF;
-            i--;
-        }
-    }
+
+    parseFun(rx_buffer, dataSize);
+
 }
 
 static void cdc_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
@@ -421,6 +347,7 @@ void USB_HANDLER(void) {
 
 void libusb_init(void) {
     cdc_init_usbd();
+
     NVIC_EnableIRQ(USB_NVIC_IRQ);
     usbd_enable(&libusb_udev, true);
     usbd_connect(&libusb_udev, true);
@@ -437,4 +364,8 @@ void libusb_init(void) {
 void lusb_write(const uint8_t *data, const uint16_t size) {
     memcpy(fifo, data, size);
     fpos = size;
+}
+
+void lusb_register_parserFunction(libusb_parser_fptr_t func) {
+	parseFun = func;
 }
