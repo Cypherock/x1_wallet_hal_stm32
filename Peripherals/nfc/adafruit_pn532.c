@@ -157,7 +157,7 @@ static __INLINE uint32_t uint32_big_decode(const uint8_t * p_encoded_data)
 #define PN532_ACK_PACKET_SIZE                                 6
 
 // Default time-out for read_passive_target_id (time required for field scan).
-#define PN532_DEFAULT_WAIT_FOR_READY_TIMEOUT                  100
+#define PN532_DEFAULT_WAIT_FOR_READY_TIMEOUT                  25
 
 /**
  * @brief Information about the communication between the host and the Adafruit PN532 Shield.
@@ -973,7 +973,6 @@ ret_code_t adafruit_pn532_deselect() {
         return err_code;
     }
 
-    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
     if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
     {
         return NFC_TIME_OUT;
@@ -1021,7 +1020,6 @@ ret_code_t adafruit_pn532_release() {
         return err_code;
     }
 
-    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
     if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
     {
         return NFC_TIME_OUT;

@@ -9,6 +9,7 @@
  *********************/
 #include "lv_port_indev.h"
 #include "board.h"
+#include "adafruit_pn532.h"
 
 /*********************
  *      DEFINES
@@ -31,6 +32,7 @@ uint32_t keypad_get_key(void);
 lv_indev_t * indev_encoder;
 lv_indev_t * indev_keypad;
 static uint8_t invert = 0x00;
+bool nfc_tapped = false;
 
 /**********************
  *      MACROS
@@ -91,6 +93,7 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
                 case 3: act_key = LV_KEY_LEFT; break;
                 case 4: act_key = LV_KEY_RIGHT; break;
                 case 5: act_key = LV_KEY_ENTER; break;
+                case 6: act_key = LV_KEY_HOME; break;
             }
         } else {
             switch(act_key) {
@@ -99,6 +102,7 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
                 case 3: act_key = LV_KEY_RIGHT; break;
                 case 4: act_key = LV_KEY_LEFT; break;
                 case 5: act_key = LV_KEY_ENTER; break;
+                case 6: act_key = LV_KEY_HOME; break;
             }
         }
         last_key = act_key;
@@ -107,7 +111,7 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     }
 
     data->key = last_key;
-
+    nfc_tapped = false;
     BSP_ClearKeyPressed();
     /*Return `false` because we are not buffering and no more data to read*/
     return false;
@@ -116,18 +120,23 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 /*Get the currently being pressed key.  0 if no key is pressed*/
 uint32_t keypad_get_key(void)
 {
+    uint32_t ret=0;
     if(READ_JOYSTICK(BSP_JOYSTICK_UP_PIN) == joystick_pressed) {
-        return 1;
+        ret = 1;
     } else if(READ_JOYSTICK(BSP_JOYSTICK_DOWN_PIN) == joystick_pressed) {
-        return 2;
+        ret = 2;
     } else if(READ_JOYSTICK(BSP_JOYSTICK_LEFT_PIN) == joystick_pressed) {
-        return 3;
+        ret = 3;
     } else if(READ_JOYSTICK(BSP_JOYSTICK_RIGHT_PIN) == joystick_pressed) {
-        return 4;
+        ret = 4;
     } else if(READ_JOYSTICK(BSP_JOYSTICK_ENTER_PIN) == joystick_pressed) {
-        return 5;
+        ret = 5;
+    } else if(0 != BSP_GetKeyPressed()){
+        ret = BSP_GetKeyPressed();
+    } else if(nfc_tapped == true){
+        ret = 6;
     }
-    return BSP_GetKeyPressed();
+    return ret;
 }
 
 #else /* Enable this file at the top */

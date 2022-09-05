@@ -21,6 +21,7 @@
 #include "usb_cdc.h"
 #include "sdk_config.h"
 #include "libusb.h"
+#include "logger.h"
 
 #define CDC_EP0_SIZE    0x08
 #define CDC_RXD_EP      0x01
@@ -263,6 +264,8 @@ static void cdc_rxonly (usbd_device *dev, uint8_t event, uint8_t ep) {
 
 }
 
+static uint8_t cdc_flags = 0;
+
 static void cdc_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
      uint32_t  _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < CDC_DATA_SZ) ? fpos : CDC_DATA_SZ);
      memmove(&fifo[0], &fifo[_t], fpos - _t);
@@ -272,6 +275,7 @@ static void cdc_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
 static void cdc_rxtx(usbd_device *dev, uint8_t event, uint8_t ep) {
     if (event == usbd_evt_eptx) {
         cdc_txonly(dev, event, ep);
+        cdc_flags = 0;
     } else {
         cdc_rxonly(dev, event, ep);
     }
@@ -364,6 +368,9 @@ void libusb_init(void) {
 void lusb_write(const uint8_t *data, const uint16_t size) {
     memcpy(fifo, data, size);
     fpos = size;
+    if (cdc_flags == 1)
+        LOG_CRITICAL("xxxc:%d: %d", data[5], uwTick);
+    cdc_flags = 1;
 }
 
 void lusb_register_parserFunction(libusb_parser_fptr_t func) {
