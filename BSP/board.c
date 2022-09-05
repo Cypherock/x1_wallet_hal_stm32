@@ -777,11 +777,7 @@ BSP_Status_t BSP_FlashSectorWrite(__IO uint32_t *dstAddr, const uint32_t* srcAdd
 	int i;
     BSP_Status_t status = BSP_OK;
     uint64_t *p64Data = (uint64_t*)srcAddr;
-	uint32_t noOfWords = noOfbytes/4;
-
-	if(noOfbytes%8 != 0)
-		noOfWords += 1;
-
+	uint32_t noOfWords = (noOfbytes>>3)<<1;
 
     if((*dstAddr < FLASH_BASE) || ((*dstAddr + noOfbytes) > FLASH_END))
         return status;
@@ -799,6 +795,27 @@ BSP_Status_t BSP_FlashSectorWrite(__IO uint32_t *dstAddr, const uint32_t* srcAdd
         else
             status = BSP_FLASH_ERR;
     }
+
+	if(noOfbytes%8 != 0){
+		uint8_t	padding = 8-(noOfbytes%8);
+		uint64_t u64Data=0;
+
+		if(padding < 4){
+			u64Data = srcAddr[1] | (0xFFFFFFFF<<((4-padding)*8));
+			u64Data = u64Data<<32;
+			u64Data |= srcAddr[0];
+		}
+		else{
+			u64Data = (uint64_t)0xFFFFFFFF << 32;
+			u64Data |= srcAddr[0] | (0xFFFFFFFF<<((8-padding)*8));
+		}
+		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, (uint32_t)(dstAddr), u64Data) == HAL_OK) {
+			if (u64Data != *(uint64_t*)dstAddr) {
+				status = 1;
+			}
+		}
+	}
+
     HAL_FLASH_Lock();
     return status;
 }
