@@ -841,6 +841,10 @@ void BSP_Buzzer_Timer(){
 
 void BSP_RNG_Init(void)
 {
+/********************  Bits definition for RNG_CR Clock Error detection register  *******************/
+#define RNG_CR_CED_Pos    (5U)
+#define RNG_CR_CED_Msk    (0x1UL << RNG_CR_RNGEN_Pos)                        /*!< 0x00000004 */
+#define RNG_CR_CED        RNG_CR_RNGEN_Msk
 
   /* USER CODE BEGIN RNG_Init 0 */
 
@@ -849,10 +853,29 @@ void BSP_RNG_Init(void)
   /* USER CODE BEGIN RNG_Init 1 */
 
   /* USER CODE END RNG_Init 1 */
-  hrng.Instance = RNG;
-  if (HAL_RNG_Init(&hrng) != HAL_OK)
-  {
+
+  BSP_RNG_End();    //disable RNG if already started
+
+  __HAL_RCC_RNG_CLK_ENABLE();                   //Enable RNG clock
+  CLEAR_BIT(RNG->SR, RNG_IT_CEI|RNG_IT_SEI);    //Clear RNG Interrupt status bits
+  SET_BIT(RNG->CR, RNG_CR_CED);                 //Enable Clock Error detection
+  SET_BIT(RNG->CR, RNG_CR_RNGEN);               //Enable RNG
+
+  //Check if any error has occured in RNG Clock or random generation
+  if(HAL_IS_BIT_SET(RNG->SR, RNG_IT_SEI) || HAL_IS_BIT_SET(RNG->SR, RNG_IT_CEI)){
+    CLEAR_BIT(RNG->SR, RNG_IT_CEI|RNG_IT_SEI);
     Error_Handler();
+  }
+
+  uint32_t tickstart = HAL_GetTick();
+  while (HAL_IS_BIT_CLR(RNG->SR, RNG_SR_DRDY)     //Is RNG data ready?
+        || HAL_IS_BIT_SET(RNG->SR, RNG_SR_SECS)   //Is Seed error detected?
+        || HAL_IS_BIT_SET(RNG->SR, RNG_SR_CECS))  //Is Clock error ongoing?
+  {
+    if ((HAL_GetTick() - tickstart) > 2)          //Taking too long?
+    {
+      Error_Handler();
+    }
   }
   /* USER CODE BEGIN RNG_Init 2 */
 
@@ -861,18 +884,32 @@ void BSP_RNG_Init(void)
 }
 
 BSP_Status_t BSP_RNG_Generate(uint32_t *random32bit) {
-    HAL_StatusTypeDef status = HAL_RNG_GenerateRandomNumber(&hrng, random32bit);
-    if (status == HAL_OK)
-        return BSP_OK;
-    else
-        return BSP_FLASH_ERR;
+  //If RNG interrupt had occured, restart RNG
+  if(HAL_IS_BIT_SET(RNG->SR, RNG_IT_SEI) || HAL_IS_BIT_SET(RNG->SR, RNG_IT_CEI)){
+    BSP_RNG_Init();
+  }
+
+  uint32_t tickstart = HAL_GetTick();
+  //Wait till RNG is ready and all issues are resolved
+  while (HAL_IS_BIT_CLR(RNG->SR, RNG_SR_DRDY) || HAL_IS_BIT_SET(RNG->SR, RNG_SR_SECS) || HAL_IS_BIT_SET(RNG->SR, RNG_SR_CECS))
+  {
+    if ((HAL_GetTick() - tickstart) > 2)
+    {
+      return BSP_RNG_HW_ERROR;
+    }
+  }
+
+  //Check if random data is zero
+  if(RNG->DR != 0) {
+    *random32bit = RNG->DR;
+    return BSP_OK;
+  }
+  return BSP_RNG_ZERO_ERROR;
 }
 
 void BSP_RNG_End(void){
-	if (HAL_RNG_DeInit(&hrng) != HAL_OK)
-	{
-		Error_Handler();
-	}
+  __HAL_RCC_RNG_CLK_DISABLE();      //disable RNG clock
+  CLEAR_BIT(RNG->CR, RNG_CR_RNGEN); //disable RNG
 }
 
 

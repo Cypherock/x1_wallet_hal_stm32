@@ -31,6 +31,8 @@ typedef enum {
     BSP_USB_ERR,
     BSP_TIMEOUT_ERR,
     BSP_BUSY_ERR,
+    BSP_RNG_ZERO_ERROR,
+    BSP_RNG_HW_ERROR
 } BSP_Status_t;
 
 typedef enum
