@@ -254,10 +254,10 @@ void SSD1306_invertDisplay(uint8_t i)
 
 void SSD1306_command(uint8_t c)
 {
-   // ret_code_t ret;
+    ret_code_t ret;
     uint8_t data[] = { 0x00, c };
-    BSP_I2C1_IO_Write(_i2caddr, data , 2);
-    //APP_ERROR_CHECK(ret);
+    ret = BSP_I2C1_IO_Write(_i2caddr, data , 2);
+    disp_error_check(ret);
 }
 
 // startscrollright
@@ -391,9 +391,9 @@ void SSD1306_display(void)
         }
         i--;
 
-       // ret_code_t ret;
-        //APP_ERROR_CHECK(ret);
-        BSP_I2C1_IO_Write(_i2caddr,tmpBuf, sizeof(tmpBuf));
+        ret_code_t ret;
+        ret = BSP_I2C1_IO_Write(_i2caddr,tmpBuf, sizeof(tmpBuf));
+        disp_error_check(ret);
     }
 
 #ifdef TWBR
