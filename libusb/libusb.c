@@ -19,6 +19,9 @@
 #include "stm32.h"
 #include "usb.h"
 #include "usb_cdc.h"
+#include "usb_hid.h"
+#include "hid_usage_desktop.h"
+#include "hid_usage_button.h"
 #include "sdk_config.h"
 #include "libusb.h"
 
@@ -64,13 +67,18 @@ struct cdc_config {
     struct usb_interface_descriptor     data;
     struct usb_endpoint_descriptor      data_eprx;
     struct usb_endpoint_descriptor      data_eptx;
+#ifdef ENABLE_HID_COMBO
+    struct usb_interface_descriptor     hid;
+    struct usb_hid_descriptor           hid_desc;
+    struct usb_endpoint_descriptor      hid_ep;
+#endif //ENABLE_HID_COMBO
 } __attribute__((packed));
 
 /* Device descriptor */
 static const struct usb_device_descriptor device_desc = {
     .bLength            = sizeof(struct usb_device_descriptor),
     .bDescriptorType    = USB_DTYPE_DEVICE,
-    .bcdUSB             = VERSION_BCD(2,0,0),
+    .bcdUSB             = VERSION_BCD(2,0,1),
     .bDeviceClass       = USB_CLASS_IAD,
     .bDeviceSubClass    = USB_SUBCLASS_IAD,
     .bDeviceProtocol    = USB_PROTO_IAD,
@@ -84,17 +92,50 @@ static const struct usb_device_descriptor device_desc = {
     .bNumConfigurations = 1,
 };
 
+/* HID mouse report desscriptor. 2 axis 5 buttons */
+static const uint8_t hid_report_desc[] = {
+    HID_USAGE_PAGE(HID_PAGE_DESKTOP),
+    HID_USAGE(HID_DESKTOP_MOUSE),
+    HID_COLLECTION(HID_APPLICATION_COLLECTION),
+        HID_USAGE(HID_DESKTOP_POINTER),
+        HID_COLLECTION(HID_PHYSICAL_COLLECTION),
+            HID_USAGE(HID_DESKTOP_X),
+            HID_USAGE(HID_DESKTOP_Y),
+            HID_LOGICAL_MINIMUM(-127),
+            HID_LOGICAL_MAXIMUM(127),
+            HID_REPORT_SIZE(8),
+            HID_REPORT_COUNT(2),
+            HID_INPUT(HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_RELATIVE ),
+            HID_USAGE_PAGE(HID_PAGE_BUTTON),
+            HID_USAGE_MINIMUM(1),
+            HID_USAGE_MAXIMUM(5),
+            HID_LOGICAL_MINIMUM(0),
+            HID_LOGICAL_MAXIMUM(1),
+            HID_REPORT_SIZE(1),
+            HID_REPORT_COUNT(5),
+            HID_INPUT(HID_IOF_DATA | HID_IOF_VARIABLE | HID_IOF_ABSOLUTE ),
+            HID_REPORT_SIZE(1),
+            HID_REPORT_COUNT(3),
+            HID_INPUT(HID_IOF_CONSTANT),
+        HID_END_COLLECTION,
+    HID_END_COLLECTION,
+};
+
 /* Device configuration descriptor */
 static const struct cdc_config config_desc = {
     .config = {
         .bLength                = sizeof(struct usb_config_descriptor),
         .bDescriptorType        = USB_DTYPE_CONFIGURATION,
         .wTotalLength           = sizeof(struct cdc_config),
+#ifdef ENABLE_HID_COMBO
+        .bNumInterfaces         = 3,
+#else
         .bNumInterfaces         = 2,
+#endif //ENABLE_HID_COMBO
         .bConfigurationValue    = 1,
         .iConfiguration         = NO_DESCRIPTOR,
         .bmAttributes           = USB_CFG_ATTR_RESERVED | USB_CFG_ATTR_SELFPOWERED,
-        .bMaxPower              = USB_CFG_POWER_MA(100),
+        .bMaxPower              = USB_CFG_POWER_MA(200),
     },
     .comm_iad = {
         .bLength = sizeof(struct usb_iad_descriptor),
@@ -179,6 +220,36 @@ static const struct cdc_config config_desc = {
         .wMaxPacketSize         = CDC_DATA_SZ,
         .bInterval              = 0x01,
     },
+#ifdef ENABLE_HID_COMBO
+    .hid = {
+        .bLength                = sizeof(struct usb_interface_descriptor),
+        .bDescriptorType        = USB_DTYPE_INTERFACE,
+        .bInterfaceNumber       = 2,
+        .bAlternateSetting      = 0,
+        .bNumEndpoints          = 1,
+        .bInterfaceClass        = USB_CLASS_HID,
+        .bInterfaceSubClass     = USB_HID_SUBCLASS_NONBOOT,
+        .bInterfaceProtocol     = USB_HID_PROTO_NONBOOT,
+        .iInterface             = NO_DESCRIPTOR,
+    },
+    .hid_desc = {
+        .bLength                = sizeof(struct usb_hid_descriptor),
+        .bDescriptorType        = USB_DTYPE_HID,
+        .bcdHID                 = VERSION_BCD(1,0,0),
+        .bCountryCode           = USB_HID_COUNTRY_NONE,
+        .bNumDescriptors        = 1,
+        .bDescriptorType0       = USB_DTYPE_HID_REPORT,
+        .wDescriptorLength0     = sizeof(hid_report_desc),
+    },
+    .hid_ep = {
+        .bLength                = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType        = USB_DTYPE_ENDPOINT,
+        .bEndpointAddress       = HID_RIN_EP,
+        .bmAttributes           = USB_EPTYPE_INTERRUPT,
+        .wMaxPacketSize         = HID_RIN_SZ,
+        .bInterval              = 50,
+    },
+#endif // ENABLE_HID_COMBO
 };
 
 static const struct usb_string_descriptor lang_desc     = USB_ARRAY_DESC(USB_LANGID_ENG_US);
@@ -252,6 +323,38 @@ static usbd_respond cdc_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_cal
             return usbd_fail;
         }
     }
+
+#ifdef ENABLE_HID_COMBO
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_INTERFACE | USB_REQ_CLASS)
+        && req->wIndex == 2 ) {
+        switch (req->bRequest) {
+        case USB_HID_SETIDLE:
+            return usbd_ack;
+        case USB_HID_GETREPORT:
+            dev->status.data_ptr = &hid_report_data;
+            dev->status.data_count = sizeof(hid_report_data);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_INTERFACE | USB_REQ_STANDARD)
+        && req->wIndex == 2
+        && req->bRequest == USB_STD_GET_DESCRIPTOR) {
+        switch (req->wValue >> 8) {
+        case USB_DTYPE_HID:
+            dev->status.data_ptr = (uint8_t*)&(config_desc.hid_desc);
+            dev->status.data_count = sizeof(config_desc.hid_desc);
+            return usbd_ack;
+        case USB_DTYPE_HID_REPORT:
+            dev->status.data_ptr = (uint8_t*)hid_report_desc;
+            dev->status.data_count = sizeof(hid_report_desc);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+#endif // ENABLE_HID_COMBO
     return usbd_fail;
 }
 
@@ -281,6 +384,10 @@ static usbd_respond cdc_setconf (usbd_device *dev, uint8_t cfg) {
     switch (cfg) {
     case 0:
         /* deconfiguring device */
+#ifdef ENABLE_HID_COMBO
+        usbd_ep_deconfig(dev, HID_RIN_EP);
+        usbd_reg_endpoint(dev, HID_RIN_EP, 0);
+#endif // ENABLE_HID_COMBO
         usbd_ep_deconfig(dev, CDC_NTF_EP);
         usbd_ep_deconfig(dev, CDC_TXD_EP);
         usbd_ep_deconfig(dev, CDC_RXD_EP);
@@ -294,6 +401,11 @@ static usbd_respond cdc_setconf (usbd_device *dev, uint8_t cfg) {
         usbd_ep_config(dev, CDC_NTF_EP, USB_EPTYPE_INTERRUPT, CDC_NTF_SZ);
         usbd_reg_endpoint(dev, CDC_RXD_EP, cdc_rxtx);
         usbd_reg_endpoint(dev, CDC_TXD_EP, cdc_rxtx);
+#ifdef ENABLE_HID_COMBO
+        usbd_ep_config(dev, HID_RIN_EP, USB_EPTYPE_INTERRUPT, HID_RIN_SZ);
+        usbd_reg_endpoint(dev, HID_RIN_EP, hid_mouse_move);
+        usbd_ep_write(dev, HID_RIN_EP, 0, 0);
+#endif // ENABLE_HID_COMBO
         usbd_ep_write(dev, CDC_TXD_EP, 0, 0);
         return usbd_ack;
     default:
