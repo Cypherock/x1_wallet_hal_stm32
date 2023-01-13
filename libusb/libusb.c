@@ -25,14 +25,22 @@
 #include "sdk_config.h"
 #include "libusb.h"
 
+static uint8_t data[1000] = {0}, data_len=0;
+// #define ENABLE_HID_COMBO
+
 #define CDC_EP0_SIZE    0x08
 #define CDC_RXD_EP      0x01
+#define WEBUSB_RXD_EP   0x03
 #define CDC_TXD_EP      0x81
+#define WEBUSB_TXD_EP   0x83
 #define CDC_DATA_SZ     0x40
 #define CDC_NTF_EP      0x82
 #define CDC_NTF_SZ      0x08
 #define HID_RIN_EP      0x83
 #define HID_RIN_SZ      0x10
+
+#define WEBUSB_REQUEST_GET_ALLOWED_ORIGINS  0x01
+#define WEBUSB_REQUEST_GET_URL              0x02
 
 #define LU_RX_PKT_BUF_COUNT     3
 #define LU_TX_PKT_BUF_COUNT     3
@@ -67,6 +75,10 @@ struct cdc_config {
     struct usb_interface_descriptor     data;
     struct usb_endpoint_descriptor      data_eprx;
     struct usb_endpoint_descriptor      data_eptx;
+    struct usb_interface_descriptor     webdata;
+    // struct usb_hid_descriptor           hid_desc;
+    struct usb_endpoint_descriptor      webdata_eprx;
+    struct usb_endpoint_descriptor      webdata_eptx;
 #ifdef ENABLE_HID_COMBO
     struct usb_interface_descriptor     hid;
     struct usb_hid_descriptor           hid_desc;
@@ -95,7 +107,7 @@ static const struct usb_device_descriptor device_desc = {
 /* HID mouse report desscriptor. 2 axis 5 buttons */
 static const uint8_t hid_report_desc[] = {
     HID_USAGE_PAGE(HID_PAGE_DESKTOP),
-    HID_USAGE(HID_DESKTOP_MOUSE),
+    HID_USAGE(HID_DESKTOP_KEYBOARD),
     HID_COLLECTION(HID_APPLICATION_COLLECTION),
         HID_USAGE(HID_DESKTOP_POINTER),
         HID_COLLECTION(HID_PHYSICAL_COLLECTION),
@@ -130,7 +142,7 @@ static const struct cdc_config config_desc = {
 #ifdef ENABLE_HID_COMBO
         .bNumInterfaces         = 3,
 #else
-        .bNumInterfaces         = 2,
+        .bNumInterfaces         = 3,
 #endif //ENABLE_HID_COMBO
         .bConfigurationValue    = 1,
         .iConfiguration         = NO_DESCRIPTOR,
@@ -220,6 +232,42 @@ static const struct cdc_config config_desc = {
         .wMaxPacketSize         = CDC_DATA_SZ,
         .bInterval              = 0x01,
     },
+    .webdata = {
+        .bLength                = sizeof(struct usb_interface_descriptor),
+        .bDescriptorType        = USB_DTYPE_INTERFACE,
+        .bInterfaceNumber       = 2,
+        .bAlternateSetting      = 0,
+        .bNumEndpoints          = 2,
+        .bInterfaceClass        = 0xff,
+        .bInterfaceSubClass     = 0x00,
+        .bInterfaceProtocol     = 0x00,
+        .iInterface             = NO_DESCRIPTOR,
+    },
+    // .hid_desc = {
+    //     .bLength                = sizeof(struct usb_hid_descriptor),
+    //     .bDescriptorType        = USB_DTYPE_HID,
+    //     .bcdHID                 = VERSION_BCD(1,0,1),
+    //     .bCountryCode           = USB_HID_COUNTRY_NONE,
+    //     .bNumDescriptors        = 1,
+    //     .bDescriptorType0       = USB_DTYPE_HID_REPORT,
+    //     .wDescriptorLength0     = sizeof(hid_report_desc),
+    // },
+    .webdata_eprx = {
+        .bLength                = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType        = USB_DTYPE_ENDPOINT,
+        .bEndpointAddress       = WEBUSB_RXD_EP,
+        .bmAttributes           = USB_EPTYPE_BULK,
+        .wMaxPacketSize         = CDC_DATA_SZ,
+        .bInterval              = 0x00,
+    },
+    .webdata_eptx = {
+        .bLength                = sizeof(struct usb_endpoint_descriptor),
+        .bDescriptorType        = USB_DTYPE_ENDPOINT,
+        .bEndpointAddress       = WEBUSB_TXD_EP,
+        .bmAttributes           = USB_EPTYPE_BULK,
+        .wMaxPacketSize         = CDC_DATA_SZ,
+        .bInterval              = 0x00,
+    },
 #ifdef ENABLE_HID_COMBO
     .hid = {
         .bLength                = sizeof(struct usb_interface_descriptor),
@@ -228,14 +276,14 @@ static const struct cdc_config config_desc = {
         .bAlternateSetting      = 0,
         .bNumEndpoints          = 1,
         .bInterfaceClass        = USB_CLASS_HID,
-        .bInterfaceSubClass     = USB_HID_SUBCLASS_NONBOOT,
-        .bInterfaceProtocol     = USB_HID_PROTO_NONBOOT,
+        .bInterfaceSubClass     = USB_HID_SUBCLASS_BOOT,
+        .bInterfaceProtocol     = USB_HID_PROTO_KEYBOARD,
         .iInterface             = NO_DESCRIPTOR,
     },
     .hid_desc = {
         .bLength                = sizeof(struct usb_hid_descriptor),
         .bDescriptorType        = USB_DTYPE_HID,
-        .bcdHID                 = VERSION_BCD(1,0,0),
+        .bcdHID                 = VERSION_BCD(1,0,1),
         .bCountryCode           = USB_HID_COUNTRY_NONE,
         .bNumDescriptors        = 1,
         .bDescriptorType0       = USB_DTYPE_HID_REPORT,
@@ -247,8 +295,35 @@ static const struct cdc_config config_desc = {
         .bEndpointAddress       = HID_RIN_EP,
         .bmAttributes           = USB_EPTYPE_INTERRUPT,
         .wMaxPacketSize         = HID_RIN_SZ,
-        .bInterval              = 50,
+        .bInterval              = 10,
     },
+    // .webdata = {
+    //     .bLength                = sizeof(struct usb_interface_descriptor),
+    //     .bDescriptorType        = USB_DTYPE_INTERFACE,
+    //     .bInterfaceNumber       = 3,
+    //     .bAlternateSetting      = 0,
+    //     .bNumEndpoints          = 2,
+    //     .bInterfaceClass        = USB_CLASS_VENDOR,
+    //     .bInterfaceSubClass     = USB_SUBCLASS_NONE,
+    //     .bInterfaceProtocol     = USB_PROTO_NONE,
+    //     .iInterface             = NO_DESCRIPTOR,
+    // },
+    // .webdata_eprx = {
+    //     .bLength                = sizeof(struct usb_endpoint_descriptor),
+    //     .bDescriptorType        = USB_DTYPE_ENDPOINT,
+    //     .bEndpointAddress       = CDC_RXD_EP,
+    //     .bmAttributes           = USB_EPTYPE_BULK,
+    //     .wMaxPacketSize         = CDC_DATA_SZ,
+    //     .bInterval              = 0x00,
+    // },
+    // .webdata_eptx = {
+    //     .bLength                = sizeof(struct usb_endpoint_descriptor),
+    //     .bDescriptorType        = USB_DTYPE_ENDPOINT,
+    //     .bEndpointAddress       = CDC_TXD_EP,
+    //     .bmAttributes           = USB_EPTYPE_BULK,
+    //     .wMaxPacketSize         = CDC_DATA_SZ,
+    //     .bInterval              = 0x00,
+    // },
 #endif // ENABLE_HID_COMBO
 };
 
@@ -272,6 +347,100 @@ static struct usb_cdc_line_coding cdc_line = {
     .bCharFormat        = USB_CDC_1_STOP_BITS,
     .bParityType        = USB_CDC_NO_PARITY,
     .bDataBits          = 8,
+    .blineState         = 0
+};
+
+struct usb_bos_cap_descriptor{
+    struct usb_bos_descriptor           bos;
+    struct usb_webusb_cap_descriptor    webusb_cap;
+    struct usb_MSOS2_cap_descriptor     msos2_cap;
+} __attribute__((packed));
+
+const struct usb_bos_cap_descriptor bos_desc = {
+    .bos = {
+        .bLength                = sizeof(struct usb_bos_descriptor),
+        .bDescriptorType        = USB_DTYPE_BOS,
+        .wTotalLenght           = sizeof(struct usb_bos_cap_descriptor),
+        .bNumDeviceCaps         = 2,
+    },
+    .webusb_cap = {
+        .bLength                = sizeof(struct usb_webusb_cap_descriptor),
+        .bDescriptorType        = USB_DTYPE_CAPABILITY,
+        .bDevCapabilityType     = 0x05,
+        .bReserved              = 0x00,
+        .PlatformCapabilityUUID = {0x38, 0xB6, 0x08, 0x34, 0xA9, 0x09, 0xA0, 0x47, 0x8B, 0xFD, 0xA0, 0x76, 0x88, 0x15, 0xB6, 0x65},
+        .bcdVersion             = VERSION_BCD(1,0,0),
+        .bVendorCode            = USB_VENDOR_WEBUSB_REQUEST,
+        .iLandingPage           = 0x01,
+    },
+    .msos2_cap = {
+        .bLength                = sizeof(struct usb_MSOS2_cap_descriptor),
+        .bDescriptorType        = USB_DTYPE_CAPABILITY,
+        .bDevCapabilityType     = 0x05,
+        .bReserved              = 0x00,
+        .PlatformCapabilityUUID = {0xDF, 0x60, 0xDD, 0xD8, 0x89, 0x45, 0xC7, 0x4C, 0x9C, 0xD2, 0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F},
+        .dwWindowsVersion       = 0x06030000,
+        .wMSOSDescriptorSetTotalLength = 0x00B2,
+        .bMS_VendorCode         = 0x02,
+        .bAltEnumCode           = 0x00,
+    }
+};
+
+struct usb_MSOS2_set_descriptors {
+    struct usb_MSOS2_desc_set_header_descriptor     desc_set_header;
+    struct usb_MSOS2_conf_subset_header_descriptor  conf_subset_header;
+    struct usb_MSOS2_func_subset_header_descriptor  func_subset_header;
+    struct usb_MSOS2_comp_id_descriptor             comp_id;
+    struct usb_MSOS2_reg_prop_descriptor            reg_prop;
+};
+
+const struct usb_MSOS2_set_descriptors msos2_desc_set = {
+    .desc_set_header = {
+        .wLength                    = sizeof(struct usb_MSOS2_desc_set_header_descriptor),
+        .wDescriptorType            = 0x0000,
+        .dwWindowsVersion           = 0x06030000,
+        .wTotalLenght               = 0x00B2,
+    },
+    .conf_subset_header = {
+        .wLength                    = sizeof(struct usb_MSOS2_conf_subset_header_descriptor),
+        .wDescriptorType            = 0x0001,
+        .bConfigurationValue        = 0x00,
+        .bReserved                  = 0x00,
+        .wTotalLenght               = 0x00A8,
+    },
+    .func_subset_header = {
+        .wLength                    = sizeof(struct usb_MSOS2_func_subset_header_descriptor),
+        .wDescriptorType            = 0x0002,
+        .bFirstInterface            = 0x01,
+        .bReserved                  = 0x00,
+        .wSubsetLenght              = 0x00A0,
+    },
+    .comp_id = {
+        .wLength                    = sizeof(struct usb_MSOS2_comp_id_descriptor),
+        .wDescriptorType            = 0x0003,
+        .CompatibleID               = {'W', 'I', 'N', 'U', 'S', 'B', '\0', '\0'},
+        .SubCompatibleID            = {'\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'},
+    },
+    .reg_prop = {
+        .wLength                    = sizeof(struct usb_MSOS2_reg_prop_descriptor),
+        .wDescriptorType            = 0x0004,
+        .wPropertyDataType          = 0x0007,
+        .wPropertyNameLength        = 0x002A,
+        .PropertyName               = {'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00, 'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00, 't', 0x00, 'e', 0x00, 
+                                        'r', 0x00, 'f', 0x00, 'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00, 'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00, 0x00, 0x00}, 
+        .wPropertyDataLength        = 0x0050,
+        .PropertyData               = {'{', 0x00, '9', 0x00, '7', 0x00, '5', 0x00, 'F', 0x00, '4', 0x00, '4', 0x00, 'D', 0x00, '9', 0x00, '-', 0x00, 
+                                        '0', 0x00, 'D', 0x00, '0', 0x00, '8', 0x00, '-', 0x00, '4', 0x00, '3', 0x00, 'F', 0x00, 'D', 0x00, '-', 0x00, 
+                                        '8', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, '-', 0x00, '1', 0x00, '2', 0x00, '7', 0x00, 'C', 0x00, 'A', 0x00, 
+                                        '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00}
+    },
+};
+
+const struct usb_url_descriptor url_desc = {
+    .bLength            = sizeof(struct usb_url_descriptor),
+    .bDescriptorType    = 0x03,
+    .bScheme            = 0x01,
+    .URL                = {0x77, 0x65, 0x62, 0x75, 0x73, 0x62, 0x2E, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2E, 0x69, 0x6F, 0x2F, 0x61, 0x72, 0x64, 0x75, 0x69, 0x6E, 0x6F, 0x2F, 0x64, 0x65, 0x6D, 0x6F, 0x73, 0x2F, 0x72, 0x67, 0x62},
 };
 
 static usbd_respond cdc_getdesc (usbd_ctlreq *req, void **address, uint16_t *length) {
@@ -305,12 +474,29 @@ static usbd_respond cdc_getdesc (usbd_ctlreq *req, void **address, uint16_t *len
     return usbd_ack;
 }
 
-
 static usbd_respond cdc_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_callback *callback) {
     if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_INTERFACE | USB_REQ_CLASS)
         && req->wIndex == 0 ) {
         switch (req->bRequest) {
         case USB_CDC_SET_CONTROL_LINE_STATE:
+            return usbd_ack;
+        case USB_CDC_SET_LINE_CODING:
+            memcpy(&cdc_line, req->data, sizeof(cdc_line));
+            return usbd_ack;
+        case USB_CDC_GET_LINE_CODING:
+            dev->status.data_ptr = &cdc_line;
+            dev->status.data_count = sizeof(cdc_line);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_INTERFACE | USB_REQ_CLASS)
+        && req->wIndex == 2 ) {
+        switch (req->bRequest) {
+        case USB_CDC_SET_CONTROL_LINE_STATE:
+            cdc_line.blineState = (uint8_t)(req->wValue);
             return usbd_ack;
         case USB_CDC_SET_LINE_CODING:
             memcpy(&cdc_line, req->data, sizeof(cdc_line));
@@ -331,8 +517,8 @@ static usbd_respond cdc_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_cal
         case USB_HID_SETIDLE:
             return usbd_ack;
         case USB_HID_GETREPORT:
-            dev->status.data_ptr = &hid_report_data;
-            dev->status.data_count = sizeof(hid_report_data);
+            dev->status.data_ptr = &hid_report_desc;
+            dev->status.data_count = sizeof(hid_report_desc);
             return usbd_ack;
         default:
             return usbd_fail;
@@ -355,6 +541,43 @@ static usbd_respond cdc_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_cal
         }
     }
 #endif // ENABLE_HID_COMBO
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_STANDARD | USB_REQ_DEVICE)
+        && req->wIndex == 0
+        && req->bRequest == USB_STD_GET_DESCRIPTOR) {
+        switch (req->wValue >> 8) {
+        case 0x0F:
+            dev->status.data_ptr = (uint8_t*)&bos_desc;
+            dev->status.data_count = sizeof(bos_desc);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_STANDARD | USB_REQ_VENDOR)
+        && req->wIndex == 7
+        && req->bRequest == 0x02) {
+        switch (req->wValue >> 8) {
+        case 0x00:
+            dev->status.data_ptr = (uint8_t*)&msos2_desc_set;
+            dev->status.data_count = sizeof(msos2_desc_set);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_STANDARD | USB_REQ_VENDOR)
+        && req->wIndex == 2
+        && req->bRequest == 0x01) {
+        switch (req->wValue) {
+        case 0x0001:
+            dev->status.data_ptr = (uint8_t*)&url_desc;
+            dev->status.data_count = sizeof(url_desc);
+            return usbd_ack;
+        default:
+            return usbd_fail;
+        }
+    }
+
     return usbd_fail;
 }
 
@@ -380,6 +603,17 @@ static void cdc_rxtx(usbd_device *dev, uint8_t event, uint8_t ep) {
     }
 }
 
+static void webusb_rxtx(usbd_device *dev, uint8_t event, uint8_t ep){
+    if (event == usbd_evt_eptx) {
+        uint32_t  _t = usbd_ep_write(dev, ep, &data[0], (data_len < CDC_DATA_SZ) ? data_len : CDC_DATA_SZ);
+        data_len -= _t;
+    } else {
+        uint32_t dataSize = usbd_ep_read(dev, ep, data, sizeof(data));
+        data_len += dataSize;
+    }
+    return;
+}
+
 static usbd_respond cdc_setconf (usbd_device *dev, uint8_t cfg) {
     switch (cfg) {
     case 0:
@@ -393,6 +627,10 @@ static usbd_respond cdc_setconf (usbd_device *dev, uint8_t cfg) {
         usbd_ep_deconfig(dev, CDC_RXD_EP);
         usbd_reg_endpoint(dev, CDC_RXD_EP, 0);
         usbd_reg_endpoint(dev, CDC_TXD_EP, 0);
+        usbd_ep_deconfig(dev, WEBUSB_TXD_EP);
+        usbd_ep_deconfig(dev, WEBUSB_RXD_EP);
+        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, 0);
+        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, 0);
         return usbd_ack;
     case 1:
         /* configuring device */
@@ -401,12 +639,15 @@ static usbd_respond cdc_setconf (usbd_device *dev, uint8_t cfg) {
         usbd_ep_config(dev, CDC_NTF_EP, USB_EPTYPE_INTERRUPT, CDC_NTF_SZ);
         usbd_reg_endpoint(dev, CDC_RXD_EP, cdc_rxtx);
         usbd_reg_endpoint(dev, CDC_TXD_EP, cdc_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, webusb_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, webusb_rxtx);
 #ifdef ENABLE_HID_COMBO
         usbd_ep_config(dev, HID_RIN_EP, USB_EPTYPE_INTERRUPT, HID_RIN_SZ);
         usbd_reg_endpoint(dev, HID_RIN_EP, hid_mouse_move);
         usbd_ep_write(dev, HID_RIN_EP, 0, 0);
 #endif // ENABLE_HID_COMBO
         usbd_ep_write(dev, CDC_TXD_EP, 0, 0);
+        usbd_ep_write(dev, WEBUSB_TXD_EP, 0, 0);
         return usbd_ack;
     default:
         return usbd_fail;

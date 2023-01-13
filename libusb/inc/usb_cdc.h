@@ -30,6 +30,7 @@
  * @{ */
 #define USB_CLASS_CDC                   0x02    /**<\brief Communicational Device class */
 #define USB_CLASS_CDC_DATA              0x0A    /**<\brief Data Interface class */
+#define USB_CLASS_VENDOR                0xFF
 /** @} */
 
 /**\name USB CDC subclass codes
@@ -84,6 +85,7 @@
 #define USB_CDC_CLEAR_COMM_FEATURE      0x04    /**<\brief Controls the settings for a particular
                                                  * communication feature of a particular target,
                                                  * setting the selected feature to its default state.*/
+#define USB_GET_BOS_DESC                0x06
 #define USB_CDC_SET_LINE_CODING         0x20    /**<\brief Allows the host to specify typical
                                                  * asynchronous line-character  formatting properties.*/
 #define USB_CDC_GET_LINE_CODING         0x21    /**<\brief Allows the host to find out the currently
@@ -91,6 +93,7 @@
 #define USB_CDC_SET_CONTROL_LINE_STATE  0x22    /**<\brief Generates RS-232/V.24 style control signals.*/
 #define USB_CDC_SEND_BREAK              0x23    /**<\brief Sends special carrier modulation that
                                                  * generates an RS-232 style break.*/
+#define USB_VENDOR_WEBUSB_REQUEST       0x0FE
 /** @} */
 
 /**\name Generic CDC specific notifications
@@ -247,6 +250,7 @@ struct usb_cdc_line_coding {
     uint8_t     bCharFormat;        /**<\brief Stop bits.*/
     uint8_t     bParityType;        /**<\brief Parity.*/
     uint8_t     bDataBits;          /**<\brief Data bits (5,6,7,8 or 16).*/
+    uint8_t     blineState;
 } __attribute__ ((packed));
 
 /** @} */
