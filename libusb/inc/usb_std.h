@@ -476,7 +476,7 @@ struct usb_bos_descriptor {
  * endpoint number.*/
 struct usb_webusb_cap_descriptor {
     uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint8_t  bDescriptorType;               /**<\brief Debug descriptor type.*/
+    uint8_t  bDescriptorType;               /**<\brief Capability descriptor type.*/
     uint8_t  bDevCapabilityType;            /**<\brief Endpoint number of the Debug Data IN endpoint.*/
     uint8_t  bReserved;                     /**<\brief Endpoint number of the Debug Data OUTendpoint.*/
     uint8_t  PlatformCapabilityUUID[16];    /**<\brief WebUSB platform capability descriptor GUID in little-endian format.*/
@@ -492,7 +492,7 @@ struct usb_webusb_cap_descriptor {
  * endpoint number.*/
 struct usb_MSOS2_cap_descriptor {
     uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint8_t  bDescriptorType;               /**<\brief Debug descriptor type.*/
+    uint8_t  bDescriptorType;               /**<\brief Capability descriptor type.*/
     uint8_t  bDevCapabilityType;            /**<\brief Endpoint number of the Debug Data IN endpoint.*/
     uint8_t  bReserved;                     /**<\brief Endpoint number of the Debug Data OUTendpoint.*/
     uint8_t  PlatformCapabilityUUID[16];    /**<\brief WebUSB platform capability descriptor GUID in little-endian format.*/
@@ -503,66 +503,56 @@ struct usb_MSOS2_cap_descriptor {
 } __attribute__((packed));
 
 
-/**\brief USB Capability descriptor
- * \details Individual, technology-specific or generic device-level capabilities are reported via Device 
- * Capability descriptors. The Device Capability descriptor has a generic header, with a sub-type field
- * (bDevCapabilityType) which defines the layout of the remainder of the descriptor.
- * endpoint number.*/
+/**\brief Microsoft OS 2.0 descriptor set header */
 struct usb_MSOS2_desc_set_header_descriptor {
     uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint16_t  wDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint32_t dwWindowsVersion;                    /**<\brief WebUSB descriptor version.*/
-    uint16_t wTotalLenght;                   /**<\brief bRequest value for WebUSB.*/
+    uint16_t  wDescriptorType;               /**<\brief Descriptor set header descriptor.*/
+    uint32_t  dwWindowsVersion;              /**<\brief Minimum compatible Windows version (Windows 8.1).*/
+    uint16_t  wTotalLenght;                  /**<\brief Total length of the descriptor set.*/
 } __attribute__((packed));
 
-/**\brief USB Capability descriptor
- * \details Individual, technology-specific or generic device-level capabilities are reported via Device 
- * Capability descriptors. The Device Capability descriptor has a generic header, with a sub-type field
- * (bDevCapabilityType) which defines the layout of the remainder of the descriptor.
- * endpoint number.*/
+/**\brief Microsoft OS 2.0 function subset header*/
 struct usb_MSOS2_conf_subset_header_descriptor {
-    uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint16_t  wDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint8_t  bConfigurationValue;                    /**<\brief WebUSB descriptor version.*/
-    uint8_t  bReserved;                    /**<\brief WebUSB descriptor version.*/
-    uint16_t wTotalLenght;                   /**<\brief bRequest value for WebUSB.*/
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Configuration subset header desc.*/
+    uint8_t   bConfigurationValue;          /**<\brief Applies to configuration 1 (indexed from 0 despite configurations normally indexed from 1).*/
+    uint8_t   bReserved;                    /**<\brief Must be set to 0.*/
+    uint16_t  wTotalLenght;                 /**<\brief Total length of the subset including this header.*/
 } __attribute__((packed));
 
-/**\brief USB Capability descriptor
- * \details Individual, technology-specific or generic device-level capabilities are reported via Device 
- * Capability descriptors. The Device Capability descriptor has a generic header, with a sub-type field
- * (bDevCapabilityType) which defines the layout of the remainder of the descriptor.
- * endpoint number.*/
+/**\brief Microsoft OS 2.0 function subset header*/
 struct usb_MSOS2_func_subset_header_descriptor {
-    uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint16_t  wDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint8_t  bFirstInterface;                    /**<\brief WebUSB descriptor version.*/
-    uint8_t  bReserved;                    /**<\brief WebUSB descriptor version.*/
-    uint16_t wSubsetLenght;                   /**<\brief bRequest value for WebUSB.*/
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Function subset header descriptor.*/
+    uint8_t   bFirstInterface;              /**<\brief First interface of the function.*/
+    uint8_t   bReserved;                    /**<\brief Must be set to 0.*/
+    uint16_t  wSubsetLenght;                /**<\brief 	Total length of the subset including this header.*/
 } __attribute__((packed));
 
+/**\brief Microsoft OS 2.0 compatible ID descriptor*/
 struct usb_MSOS2_comp_id_descriptor{
-    uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint16_t  wDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint8_t  CompatibleID[8];                    /**<\brief WebUSB descriptor version.*/
-    uint8_t  SubCompatibleID[8];                    /**<\brief WebUSB descriptor version.*/
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Compatible ID descriptor.*/
+    uint8_t   CompatibleID[8];              /**<\brief ASCII string padded to 8 bytes.*/
+    uint8_t   SubCompatibleID[8];           /**<\brief ASCII string padded to 8 bytes.*/
 } __attribute__((packed));
 
+/**\brief Microsoft OS 2.0 registry property descriptor*/
 struct usb_MSOS2_reg_prop_descriptor{
-    uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint16_t  wDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint16_t wPropertyDataType;                    /**<\brief WebUSB descriptor version.*/
-    uint16_t wPropertyNameLength;                    /**<\brief WebUSB descriptor version.*/
-    uint8_t  PropertyName[42];
-    uint16_t wPropertyDataLength;
-    uint8_t  PropertyData[80];
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Registry property descriptor.*/
+    uint16_t  wPropertyDataType;            /**<\brief REG_MULTI_SZ.*/
+    uint16_t  wPropertyNameLength;          /**<\brief Length of the property name.*/
+    uint8_t   PropertyName[42];             /**<\brief Property name with null terminator encoded in UTF-16LE.*/
+    uint16_t  wPropertyDataLength;          /**<\brief Length of the property value.*/
+    uint8_t   PropertyData[80];             /**<\brief GUID plus two null terminators encoded in UTF-16LE.*/
 } __attribute__((packed));
 
 struct usb_url_descriptor{
-    uint8_t bLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint8_t bDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint8_t bScheme;                    /**<\brief WebUSB descriptor version.*/
-    uint8_t URL[34];                    /**<\brief WebUSB descriptor version.*/
+    uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
+    uint8_t  bDescriptorType;               /**<\brief Debug descriptor type.*/
+    uint8_t  bScheme;                    /**<\brief WebUSB descriptor version.*/
+    uint8_t  URL[34];                    /**<\brief WebUSB descriptor version.*/
 } __attribute__((packed));
 
 /** @} */
