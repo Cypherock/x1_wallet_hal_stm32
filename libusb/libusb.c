@@ -579,9 +579,10 @@ static void comm_rxtx(usbd_device *dev, uint8_t event, uint8_t ep) {
 }
 
 #if (ENABLE_HID_WEBUSB_COMM == 1)
-static void webusb_rxtx(usbd_device *dev, uint8_t event, uint8_t ep){
+static void loopback_rxtx(usbd_device *dev, uint8_t event, uint8_t ep){
     if (event == usbd_evt_eptx) {
-        uint32_t  _t = usbd_ep_write(dev, ep, data+data_len, (data_len < DEVICE_DATA_EP_SIZE) ? data_len : DEVICE_DATA_EP_SIZE);
+        uint32_t  _t = usbd_ep_write(dev, ep, data, (data_len < DEVICE_DATA_EP_SIZE) ? data_len : DEVICE_DATA_EP_SIZE);
+        memcpy(data, data + _t, data_len - _t);
         data_len -= _t;
     } else {
         uint32_t dataSize = usbd_ep_read(dev, ep, data+data_len, sizeof(data));
