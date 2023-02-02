@@ -565,9 +565,20 @@ static void comm_rxonly (usbd_device *dev, uint8_t event, uint8_t ep) {
 }
 
 static void comm_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
-     uint32_t  _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < DEVICE_DATA_EP_SIZE) ? fpos : DEVICE_DATA_EP_SIZE);
-     memmove(&fifo[0], &fifo[_t], fpos - _t);
-     fpos -= _t;
+     uint32_t  _t = 0;
+    if(ep == DEVICE_DATA_TX_EP){
+        if(fpos == 0){
+            usbd_ep_write(dev, ep, &fifo[0], 0);
+            return;
+        }else if(fpos >= DEVICE_DATA_EP_SIZE){
+            _t = usbd_ep_write(dev, ep, &fifo[0], DEVICE_DATA_EP_SIZE);
+        }else{
+            usbd_ep_write(dev, ep, &fifo[0], DEVICE_DATA_EP_SIZE);
+            _t = fpos;
+        }     
+    }
+    memmove(&fifo[0], &fifo[_t], fpos - _t);
+    fpos -= _t;
 }
 
 static void comm_rxtx(usbd_device *dev, uint8_t event, uint8_t ep) {
