@@ -565,10 +565,11 @@ static void comm_rxonly (usbd_device *dev, uint8_t event, uint8_t ep) {
 }
 
 static void comm_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
+#if (ENABLE_HID_WEBUSB_COMM == 1)
      uint32_t  _t = 0;
     if(ep == DEVICE_DATA_TX_EP){
         if(fpos == 0){
-            usbd_ep_write(dev, ep, &fifo[0], 0);
+            usbd_ep_write(dev, ep, &fifo[0], fpos);
             return;
         }else if(fpos >= DEVICE_DATA_EP_SIZE){
             _t = usbd_ep_write(dev, ep, &fifo[0], DEVICE_DATA_EP_SIZE);
@@ -577,6 +578,15 @@ static void comm_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
             _t = fpos;
         }     
     }
+    else {
+        _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < DEVICE_DATA_EP_SIZE) ? fpos : DEVICE_DATA_EP_SIZE);
+    }
+#elif (ENABLE_CDC_COMM == 1)
+    uint32_t _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < DEVICE_DATA_EP_SIZE) ? fpos : DEVICE_DATA_EP_SIZE);
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
+#endif
+    
     memmove(&fifo[0], &fifo[_t], fpos - _t);
     fpos -= _t;
 }
@@ -628,8 +638,8 @@ static usbd_respond device_setconf (usbd_device *dev, uint8_t cfg) {
 #if (ENABLE_HID_WEBUSB_COMM == 1)
         usbd_ep_config(dev, WEBUSB_RXD_EP, USB_EPTYPE_INTERRUPT /*| USB_EPTYPE_DBLBUF*/, DEVICE_DATA_EP_SIZE);
         usbd_ep_config(dev, WEBUSB_TXD_EP, USB_EPTYPE_INTERRUPT /*| USB_EPTYPE_DBLBUF*/, DEVICE_DATA_EP_SIZE);
-        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, comm_rxtx);
-        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, comm_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, loopback_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, loopback_rxtx);
         usbd_ep_write(dev, WEBUSB_TXD_EP, 0, 0);
 #endif
         return usbd_ack;
