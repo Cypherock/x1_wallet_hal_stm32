@@ -10,6 +10,11 @@
 #include "lv_port_indev.h"
 #include "board.h"
 #include "adafruit_pn532.h"
+#ifdef DEV_BUILD
+#include "dev_utils.h"
+bool alternate = false;
+extern ekp_queue* ekp_q;
+#endif
 
 /*********************
  *      DEFINES
@@ -78,6 +83,7 @@ static void keypad_init(void)
 /* Will be called by the library to read the mouse */
 static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 {
+
     static uint32_t last_key = 0;
 
     /*Get whether the a key is pressed and save the pressed key*/
@@ -112,6 +118,23 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
 
     data->key = last_key;
     nfc_tapped = false;
+#ifdef DEV_BUILD
+    if(!alternate){
+        if(!ekp_is_empty(ekp_q)){
+            ekp_queue_node *qn = ekp_dequeue(ekp_q);
+            data->state = LV_INDEV_STATE_PR;
+            data->key = qn->event;
+            BSP_DelayMs(qn->delay);
+            free(qn);
+            alternate = !alternate;
+        }
+    }else{
+        data->state = LV_INDEV_STATE_REL;
+        BSP_DelayMs(RELEASE_DELAY);
+        alternate = !alternate;
+    }
+#endif
+
     BSP_ClearKeyPressed();
     /*Return `false` because we are not buffering and no more data to read*/
     return false;
