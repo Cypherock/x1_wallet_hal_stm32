@@ -13,7 +13,6 @@
 #ifdef DEV_BUILD
 #include "dev_utils.h"
 bool alternate = false;
-extern ekp_queue* ekp_q;
 #endif
 
 /*********************
@@ -120,8 +119,8 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     nfc_tapped = false;
 #ifdef DEV_BUILD
     if(!alternate){
-        if(!ekp_is_empty(ekp_q)){
-            ekp_queue_node *qn = ekp_dequeue(ekp_q);
+        if(!ekp_is_empty()){
+            ekp_queue_node *qn = ekp_dequeue();
             data->state = LV_INDEV_STATE_PR;
             data->key = qn->event;
             BSP_DelayMs(qn->delay);
