@@ -10,10 +10,6 @@
 #include "lv_port_indev.h"
 #include "board.h"
 #include "adafruit_pn532.h"
-#ifdef DEV_BUILD
-#include "dev_utils.h"
-bool alternate = false;
-#endif
 
 /*********************
  *      DEFINES
@@ -37,6 +33,9 @@ lv_indev_t * indev_encoder;
 lv_indev_t * indev_keypad;
 static uint8_t invert = 0x00;
 bool nfc_tapped = false;
+#ifdef DEV_BUILD
+static ekp_process_queue_fptr process_key_presses_queue = NULL;
+#endif
 
 /**********************
  *      MACROS
@@ -68,6 +67,11 @@ void lv_port_indev_init(void)
     indev_drv.read_cb = keypad_read;
     indev_keypad      = lv_indev_drv_register(&indev_drv);
 }
+#ifdef DEV_BUILD
+void ekp_register_process_func(ekp_process_queue_fptr func) {
+    process_key_presses_queue = func;
+}
+#endif
 
 /**********************
  *   STATIC FUNCTIONS
@@ -118,20 +122,8 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     data->key = last_key;
     nfc_tapped = false;
 #ifdef DEV_BUILD
-    if(!alternate){
-        if(!ekp_is_empty()){
-            ekp_queue_node *qn = ekp_dequeue();
-            data->state = LV_INDEV_STATE_PR;
-            data->key = qn->event;
-            BSP_DelayMs(qn->delay);
-            free(qn);
-            alternate = !alternate;
-        }
-    }else{
-        data->state = LV_INDEV_STATE_REL;
-        BSP_DelayMs(RELEASE_DELAY);
-        alternate = !alternate;
-    }
+    if (process_key_presses_queue != NULL)
+        process_key_presses_queue(data);
 #endif
 
     BSP_ClearKeyPressed();
