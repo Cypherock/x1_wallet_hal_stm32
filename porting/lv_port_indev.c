@@ -32,7 +32,6 @@ uint32_t keypad_get_key(void);
 lv_indev_t * indev_encoder;
 lv_indev_t * indev_keypad;
 static uint8_t invert = 0x00;
-bool nfc_tapped = false;
 #ifdef DEV_BUILD
 static ekp_process_queue_fptr process_key_presses_queue = NULL;
 #endif
@@ -120,7 +119,6 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
     }
 
     data->key = last_key;
-    nfc_tapped = false;
 #ifdef DEV_BUILD
     if (process_key_presses_queue != NULL)
         process_key_presses_queue(data);
@@ -147,8 +145,6 @@ uint32_t keypad_get_key(void)
         ret = 5;
     } else if(0 != BSP_GetKeyPressed()){
         ret = BSP_GetKeyPressed();
-    } else if(nfc_tapped == true){
-        ret = 6;
     }
     return ret;
 }
