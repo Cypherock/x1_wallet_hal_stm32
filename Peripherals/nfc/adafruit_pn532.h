@@ -166,6 +166,8 @@
 #define MIFARE_CMD_INCREMENT        (0xC1)
 #define MIFARE_CMD_STORE            (0xC2)
 #define MIFARE_ULTRALIGHT_CMD_WRITE (0xA2)
+
+#define PN532_DIAGNOSE_CARD_DETECTED_RESP 0     // Response for PN532 diagnose card presence command
 /** @} */
 
 /**

@@ -36,6 +36,7 @@
 #ifndef TAG_DETECT_TIMEOUT
 #define TAG_DETECT_TIMEOUT  4000
 #define SHORT_TIMEOUT       500
+#define VERY_SHORT_TIMEOUT  10
 #endif
 
 #ifndef PN532_IRQ
@@ -1199,10 +1200,9 @@ ret_code_t adafruit_diagnose_card_presence()
         return err_code;
     }
 
-    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
-    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    if (!adafruit_pn532_waitready_ms(VERY_SHORT_TIMEOUT))
     {
-        return STM_ERROR_INTERNAL;
+        return STM_ERROR_TIMEOUT;
     }
 
     err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
