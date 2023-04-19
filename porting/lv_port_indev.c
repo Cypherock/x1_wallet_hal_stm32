@@ -101,7 +101,6 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
                 case 3: act_key = LV_KEY_LEFT; break;
                 case 4: act_key = LV_KEY_RIGHT; break;
                 case 5: act_key = LV_KEY_ENTER; break;
-                case 6: act_key = LV_KEY_HOME; break;
             }
         } else {
             switch(act_key) {
@@ -110,7 +109,6 @@ static bool keypad_read(lv_indev_drv_t * indev_drv, lv_indev_data_t * data)
                 case 3: act_key = LV_KEY_RIGHT; break;
                 case 4: act_key = LV_KEY_LEFT; break;
                 case 5: act_key = LV_KEY_ENTER; break;
-                case 6: act_key = LV_KEY_HOME; break;
             }
         }
         last_key = act_key;
