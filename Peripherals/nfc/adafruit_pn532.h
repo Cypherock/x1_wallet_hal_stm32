@@ -319,7 +319,7 @@ ret_code_t adafruit_pn532_field_off(void);
  *   @retval        STM_SUCCESS           If the command was sent successfully. Otherwise,
  *                                        an error code is returned.
  */
-ret_code_t pn532_set_nfca_target_init_command();
+ret_code_t pn532_set_nfca_target_init_command(void);
 
 /**  @brief Function reads response from PN532 after detecting an ISO14443A (NFC-A) target presence in the RF field.
  *
