@@ -142,6 +142,7 @@ void BSP_I2C1_AddressScan(void);
 void BSP_I2C2_AddressScan(void);
 void BSP_ClearKeyPressed(void);
 uint32_t BSP_GetKeyPressed(void);
+uint32_t disp_error_check(uint32_t ret);
 
 void BSP_DelayMs(uint32_t delayValue);
 void BSP_DelayUs(uint32_t delay);

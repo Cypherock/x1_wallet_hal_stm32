@@ -657,6 +657,18 @@ void BSP_ClearKeyPressed(void)
   Key_Pressed = 0;;
 }
 
+uint32_t disp_error_check(uint32_t ret){
+  if(ret != HAL_OK){
+    while (1)
+    {
+      BSP_TIM2_PWM_Start(50);
+      BSP_DelayMs(100);
+      BSP_TIM2_PWM_Start(50);
+      BSP_DelayMs(2800);
+    }
+  }
+}
+
 /**
   * @brief  Gets the page of a given address
   * @param  Addr: Address of the FLASH Memory
