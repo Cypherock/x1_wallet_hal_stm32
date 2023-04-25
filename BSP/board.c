@@ -571,6 +571,106 @@ void BSP_GPIO_Init(uint32_t hardware_version)
 		  hardware_version = DEVICE_HARDWARE_STM32_3;
 	  }
 
+#ifndef NDEBUG
+    /**
+     * Set state of all unused GPIOs as Input pulled up in release builds to achieve best
+     * EMI/EMC results.
+     */
+
+    __HAL_RCC_GPIOE_CLK_ENABLE();
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+      HAL_PWREx_EnableVddIO2();
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+    __HAL_RCC_GPIOH_CLK_ENABLE();
+
+    /*Configure GPIO pins : Unused_Pin UnusedE1_Pin UnusedE4_Pin UnusedE2_Pin
+            UnusedE5_Pin UnusedE0_Pin UnusedE6_Pin UnusedE8_Pin
+            UnusedE10_Pin UnusedE12_Pin UnusedE7_Pin UnusedE9_Pin
+            UnusedE11_Pin UnusedE13_Pin UnusedE14_Pin UnusedE15_Pin */
+    GPIO_InitStruct.Pin = Unused_Pin|UnusedE1_Pin|UnusedE4_Pin|UnusedE2_Pin
+                |UnusedE5_Pin|UnusedE0_Pin|UnusedE6_Pin|UnusedE8_Pin
+                |UnusedE10_Pin|UnusedE12_Pin|UnusedE7_Pin|UnusedE9_Pin
+                |UnusedE11_Pin|UnusedE13_Pin|UnusedE14_Pin|UnusedE15_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedB8_Pin UnusedB3_Pin UnusedB9_Pin
+                UnusedB5_Pin UnusedB15_Pin UnusedB14_Pin UnusedB13_Pin
+                UnusedB2_Pin UnusedB10_Pin UnusedB12_Pin UnusedB0_Pin
+                UnusedB1_Pin */
+    GPIO_InitStruct.Pin = UnusedB8_Pin|UnusedB3_Pin|UnusedB9_Pin
+                |UnusedB5_Pin|UnusedB15_Pin|UnusedB14_Pin|UnusedB13_Pin
+                |UnusedB2_Pin|UnusedB10_Pin|UnusedB12_Pin|UnusedB0_Pin
+                |UnusedB1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedD7_Pin UnusedD5_Pin UnusedD6_Pin UnusedD4_Pin
+                UnusedD3_Pin UnusedD1_Pin UnusedD2_Pin UnusedD0_Pin
+                UnusedD15_Pin UnusedD14_Pin UnusedD13_Pin UnusedD12_Pin
+                UnusedD11_Pin UnusedD10_Pin UnusedD9_Pin UnusedD8_Pin */
+    GPIO_InitStruct.Pin = UnusedD7_Pin|UnusedD5_Pin|UnusedD6_Pin|UnusedD4_Pin
+                |UnusedD3_Pin|UnusedD1_Pin|UnusedD2_Pin|UnusedD0_Pin
+                |UnusedD15_Pin|UnusedD14_Pin|UnusedD13_Pin|UnusedD12_Pin
+                |UnusedD11_Pin|UnusedD10_Pin|UnusedD9_Pin|UnusedD8_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedA15_Pin UnusedA14_Pin UnusedA13_Pin UnusedA10_Pin
+                UnusedA9_Pin UnusedA8_Pin UnusedA4_Pin UnusedA7_Pin
+                UnusedA2_Pin UnusedA5_Pin UnusedA3_Pin UnusedA6_Pin
+                UnusedA1_Pin */
+    GPIO_InitStruct.Pin = UnusedA15_Pin|UnusedA14_Pin|UnusedA13_Pin|UnusedA10_Pin
+                |UnusedA9_Pin|UnusedA8_Pin|UnusedA4_Pin|UnusedA7_Pin
+                |UnusedA2_Pin|UnusedA5_Pin|UnusedA3_Pin|UnusedA6_Pin
+                |UnusedA1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedC12_Pin UnusedC10_Pin UnusedC13_Pin UnusedC11_Pin
+                UnusedC14_Pin UnusedC9_Pin UnusedC15_Pin UnusedC0_Pin
+                UnusedC1_Pin UnusedC2_Pin UnusedC3_Pin */
+    GPIO_InitStruct.Pin = UnusedC12_Pin|UnusedC10_Pin|UnusedC13_Pin|UnusedC11_Pin
+                |UnusedC14_Pin|UnusedC9_Pin|UnusedC15_Pin|UnusedC0_Pin
+                |UnusedC1_Pin|UnusedC2_Pin|UnusedC3_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedG14_Pin UnusedG13_Pin UnusedG12_Pin UnusedG10_Pin
+                UnusedG9_Pin UnusedG5_Pin UnusedG3_Pin UnusedG4_Pin
+                UnusedG11_Pin UnusedG6_Pin UnusedG1_Pin UnusedG2_Pin
+                UnusedG7_Pin UnusedG0_Pin UnusedG8_Pin UnusedG15_Pin */
+    GPIO_InitStruct.Pin = UnusedG14_Pin|UnusedG13_Pin|UnusedG12_Pin|UnusedG10_Pin
+                |UnusedG9_Pin|UnusedG5_Pin|UnusedG3_Pin|UnusedG4_Pin
+                |UnusedG11_Pin|UnusedG6_Pin|UnusedG1_Pin|UnusedG2_Pin
+                |UnusedG7_Pin|UnusedG0_Pin|UnusedG8_Pin|UnusedG15_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+    /*Configure GPIO pins : UnusedF2_Pin UnusedF1_Pin UnusedF0_Pin UnusedF3_Pin
+                UnusedF4_Pin UnusedF5_Pin UnusedF12_Pin UnusedF14_Pin
+                UnusedF15_Pin UnusedF11_Pin UnusedF13_Pin */
+    GPIO_InitStruct.Pin = UnusedF2_Pin|UnusedF1_Pin|UnusedF0_Pin|UnusedF3_Pin
+                |UnusedF4_Pin|UnusedF5_Pin|UnusedF12_Pin|UnusedF14_Pin
+                |UnusedF15_Pin|UnusedF11_Pin|UnusedF13_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+      /*Configure GPIO pins : UnusedH0_Pin UnusedH1_Pin */
+    GPIO_InitStruct.Pin = UnusedH0_Pin|UnusedH1_Pin;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
+    HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
+#endif
+
 	  /*Configure GPIO pins : PC4 PC5 PC6 PC7
 	                           PC8 */
 	  GPIO_InitStruct.Pin = BSP_JOYSTICK_UP_PIN|BSP_JOYSTICK_DOWN_PIN|BSP_JOYSTICK_RIGHT_PIN|BSP_JOYSTICK_LEFT_PIN
