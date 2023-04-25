@@ -571,6 +571,12 @@ void BSP_GPIO_Init(uint32_t hardware_version)
 		  hardware_version = DEVICE_HARDWARE_STM32_3;
 	  }
 
+#ifndef NDEBUG
+    /**
+     * Set state of all unused GPIOs as Input pulled up in release builds to achieve best
+     * EMI/EMC results.
+     */
+
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
@@ -663,6 +669,7 @@ void BSP_GPIO_Init(uint32_t hardware_version)
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
+#endif
 
 	  /*Configure GPIO pins : PC4 PC5 PC6 PC7
 	                           PC8 */
