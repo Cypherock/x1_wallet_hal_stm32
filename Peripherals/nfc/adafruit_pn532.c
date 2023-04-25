@@ -36,6 +36,7 @@
 #ifndef TAG_DETECT_TIMEOUT
 #define TAG_DETECT_TIMEOUT  4000
 #define SHORT_TIMEOUT       500
+#define VERY_SHORT_TIMEOUT  10
 #endif
 
 #ifndef PN532_IRQ
@@ -504,6 +505,60 @@ ret_code_t adafruit_pn532_passive_activation_retries_set(uint8_t max_retries)
     return STM_SUCCESS;
 }
 
+ret_code_t pn532_set_nfca_target_init_command(void){
+    m_pn532_packet_buf[0] = PN532_COMMAND_INLISTPASSIVETARGET;
+    m_pn532_packet_buf[1] = 1; // Maximum number of targets.
+    m_pn532_packet_buf[2] = PN532_MIFARE_ISO14443A_BAUD;
+
+    ret_code_t err_code = adafruit_pn532_cmd_send(m_pn532_packet_buf,
+                                                  COMMAND_INLISTPASSIVETARGET_BASE_LENGTH,
+                                                  PN532_DEFAULT_WAIT_FOR_READY_TIMEOUT);
+
+    return err_code;
+}
+
+ret_code_t pn532_read_nfca_target_init_resp(nfc_a_tag_info * p_tag_info){
+    if (p_tag_info == NULL)
+    {
+        return NFC_INVALID_PARAM;
+    }
+    if (!adafruit_pn532_is_ready())
+    {
+        return NFC_RESP_NOT_READY;
+    }
+
+    ret_code_t err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
+                                        REPLY_INLISTPASSIVETARGET_106A_TARGET_LENGTH);
+    if (err_code != STM_SUCCESS)
+    {
+        return err_code;
+    }
+
+    if (m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_NBTG_OFFSET] != 1)
+    {
+        return NFC_INVALID_RESPONSE;
+    }
+
+    if (MAX_NFC_A_ID_LEN < m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_UID_LEN_OFFSET])
+    {
+        return NFC_INVALID_LENGTH;
+    }
+
+    p_tag_info->sens_res[SENS_RES_ANTICOLLISION_INFO_BYTE] =
+        m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_SENS_RES_BYTE_1_OFFSET];
+    p_tag_info->sens_res[SENS_RES_PLATFORM_INFO_BYTE] =
+        m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_SENS_RES_BYTE_2_OFFSET];
+
+    p_tag_info->sel_res    = m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_SEL_RES_OFFSET];
+    p_tag_info->nfc_id_len = m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_UID_LEN_OFFSET];
+    memcpy(p_tag_info->nfc_id,
+           m_pn532_packet_buf + REPLY_INLISTPASSIVETARGET_106A_UID_OFFSET,
+           p_tag_info->nfc_id_len);
+
+    m_pn532_object.in_listed_tag = m_pn532_packet_buf[REPLY_INLISTPASSIVETARGET_106A_TG_OFFSET];
+
+    return STM_SUCCESS;
+}
 
 ret_code_t adafruit_pn532_nfc_a_target_init(nfc_a_tag_info * p_tag_info,
                                             uint16_t         timeout)
@@ -1129,7 +1184,7 @@ ret_code_t adafruit_diagnose_comm_line(uint8_t * p_send, uint8_t send_len)
     return STM_SUCCESS;
 }
 
-ret_code_t adafruit_diagnose_card_presence()
+ret_code_t adafruit_diagnose_card_presence(void)
 {
     uint8_t p_response_len = 1;
 
@@ -1145,10 +1200,9 @@ ret_code_t adafruit_diagnose_card_presence()
         return err_code;
     }
 
-    // Note : The wait time was increased from 1 sec to 10 sec as some APDU in card upgrade take longer than 1 sec
-    if (!adafruit_pn532_waitready_ms(SHORT_TIMEOUT))
+    if (!adafruit_pn532_waitready_ms(VERY_SHORT_TIMEOUT))
     {
-        return STM_ERROR_INTERNAL;
+        return STM_ERROR_TIMEOUT;
     }
 
     err_code = adafruit_pn532_data_read(m_pn532_packet_buf,
@@ -1178,6 +1232,7 @@ ret_code_t adafruit_diagnose_card_presence()
         return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
     }
 
+    // Return the status byte received from PN532 response.
     return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
 }
 
