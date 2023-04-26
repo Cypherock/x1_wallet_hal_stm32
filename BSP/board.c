@@ -571,7 +571,7 @@ void BSP_GPIO_Init(uint32_t hardware_version)
 		  hardware_version = DEVICE_HARDWARE_STM32_3;
 	  }
 
-#ifndef NDEBUG
+#ifdef NDEBUG
     /**
      * Set state of all unused GPIOs as Input pulled up in release builds to achieve best
      * EMI/EMC results.
