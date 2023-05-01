@@ -20,8 +20,6 @@
 #include "usb.h"
 #include "usb_cdc.h"
 #include "usb_hid.h"
-#include "hid_usage_desktop.h"
-#include "hid_usage_button.h"
 #include "sdk_config.h"
 #include "libusb.h"
 
@@ -53,7 +51,7 @@
 #define DEVICE_DATA_TX_EP   HID_TXD_EP
 #define DEVICE_DATA_EP_TYPE USB_EPTYPE_INTERRUPT
 #else
-#error "Define USB CONF CDC or HID + WEBUSB"
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
 
 #define LU_RX_PKT_BUF_COUNT     3
@@ -77,7 +75,7 @@
 libusb_parser_fptr_t parseFun = NULL;
 
 /* Declaration of the report descriptor */
-struct cdc_config {
+struct usb_device__config {
     struct usb_config_descriptor        config;
 #if (ENABLE_CDC_COMM == 1)
     struct usb_iad_descriptor           comm_iad;
@@ -98,6 +96,8 @@ struct cdc_config {
     struct usb_interface_descriptor     webdata;
     struct usb_endpoint_descriptor      webdata_eprx;
     struct usb_endpoint_descriptor      webdata_eptx;
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
 
 } __attribute__((packed));
@@ -110,6 +110,8 @@ static const struct usb_device_descriptor device_desc = {
     .bcdUSB             = VERSION_BCD(2,0,0),
 #elif (ENABLE_HID_WEBUSB_COMM == 1)
     .bcdUSB             = VERSION_BCD(2,1,0),
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
     .bDeviceClass       = USB_CLASS_IAD,
     .bDeviceSubClass    = USB_SUBCLASS_IAD,
@@ -146,15 +148,17 @@ static const uint8_t hid_report_desc[] = {
 #endif
 
 /* Device configuration descriptor */
-static const struct cdc_config config_desc = {
+static const struct usb_device__config config_desc = {
     .config = {
         .bLength                = sizeof(struct usb_config_descriptor),
         .bDescriptorType        = USB_DTYPE_CONFIGURATION,
-        .wTotalLength           = sizeof(struct cdc_config),
+        .wTotalLength           = sizeof(struct usb_device__config),
 #if (ENABLE_CDC_COMM == 1)
         .bNumInterfaces         = 2,
 #elif (ENABLE_HID_WEBUSB_COMM == 1)
         .bNumInterfaces         = 2,
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
         .bConfigurationValue    = 1,
         .iConfiguration         = NO_DESCRIPTOR,
@@ -309,6 +313,8 @@ static const struct cdc_config config_desc = {
         .wMaxPacketSize         = WEBUSB_DATA_SZ,
         .bInterval              = 0x01,
     },
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
 };
 
@@ -582,20 +588,23 @@ static void comm_rxonly(usbd_device *dev, uint8_t ep){
     comm_libusb__interface_e interface;
 
     // Set receive buffer based on endpoint
+#if (ENABLE_HID_WEBUSB_COMM == 1)
     if(ep == DEVICE_DATA_RX_EP){
         buff = &data_ep_buffer;
-#if (ENABLE_CDC_COMM == 1)
-        interface = COMM_LIBUSB__CDC;
-#elif (ENABLE_HID_WEBUSB_COMM == 1)
         interface = COMM_LIBUSB__HID;
-#endif
     }else if(ep == WEBUSB_RXD_EP){
         buff = &webusb_buffer;
         interface = COMM_LIBUSB__WEBUSB;
     }else{
         return;
     }
- 
+#elif (ENABLE_CDC_COMM == 1)
+    buff = &data_ep_buffer;
+    interface = COMM_LIBUSB__CDC;
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
+#endif
+
     uint32_t dataSize = usbd_ep_read(dev, ep, buff->rx_buffer, LU_RX_BUF_SIZE);
 
     // Call application parser
@@ -624,6 +633,8 @@ static void comm_txonly(usbd_device *dev, uint8_t ep){
     }
 #elif (ENABLE_CDC_COMM == 1)
     buff = &data_ep_buffer;
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
 
     /**
@@ -705,7 +716,7 @@ static usbd_respond device_setconf (usbd_device *dev, uint8_t cfg) {
     }
 }
 
-void cdc_init_usbd(void) {
+void usb_device_config_init(void) {
     usbd_init(&libusb_udev, &usbd_hw, 8, ubuf, sizeof(ubuf));
     usbd_reg_config(&libusb_udev, device_setconf);
     usbd_reg_control(&libusb_udev, device_control);
@@ -750,7 +761,7 @@ void USB_HANDLER(void) {
 }
 
 void libusb_init(void) {
-    cdc_init_usbd();
+    usb_device_config_init();
 
     NVIC_EnableIRQ(USB_NVIC_IRQ);
     usbd_enable(&libusb_udev, true);
@@ -758,7 +769,7 @@ void libusb_init(void) {
 }
 #else
 void libusb_init(void) {
-    cdc_init_usbd();
+    usb_device_config_init();
     usbd_enable(&libusb_udev, true);
     usbd_connect(&libusb_udev, true);
     // Need to add a call to usbd_poll() in the event loop
@@ -780,6 +791,8 @@ void lusb_write(const uint8_t *data, const uint16_t size, comm_libusb__interface
     else if(interface == COMM_LIBUSB__WEBUSB){
         buff = &webusb_buffer;
     }
+#else
+    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
 #endif
     else{
         return;
