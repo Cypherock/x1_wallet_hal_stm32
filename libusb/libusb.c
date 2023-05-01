@@ -25,8 +25,6 @@
 #include "sdk_config.h"
 #include "libusb.h"
 
-static uint8_t data[1000] = {0}, data_len=0;
-
 #define DEVICE_DATA_EP_SIZE   0x40
 #define CDC_EP0_SIZE    0x08
 
@@ -76,7 +74,7 @@ static uint8_t data[1000] = {0}, data_len=0;
 #define CDC_PROTOCOL USB_PROTO_NONE
 #endif
 
-libusb_parser_fptr_t parseFun;
+libusb_parser_fptr_t parseFun = NULL;
 
 /* Declaration of the report descriptor */
 struct cdc_config {
@@ -323,11 +321,28 @@ static const struct usb_string_descriptor *const dtable[] = {
     &prod_desc_en,
 };
 
+typedef struct{
+    uint8_t  tx_fifo[LU_TX_BUF_SIZE];
+    uint8_t  rx_buffer[LU_RX_BUF_SIZE];
+    uint32_t fifo_pos;
+} rxtx_buffer;
+
 usbd_device libusb_udev;
 uint32_t	ubuf[0x20];
-uint8_t     fifo[LU_TX_BUF_SIZE];
-uint8_t     rx_buffer[LU_RX_BUF_SIZE];
-uint32_t    fpos = 0;
+
+#if (ENABLE_HID_WEBUSB_COMM == 1)
+rxtx_buffer webusb_buffer = {
+    .tx_fifo = {0},
+    .rx_buffer = {0},
+    .fifo_pos = 0
+};
+#endif
+
+rxtx_buffer data_ep_buffer = {
+    .tx_fifo = {0},
+    .rx_buffer = {0},
+    .fifo_pos = 0
+};
 
 static struct usb_cdc_line_coding cdc_line = {
     .dwDTERate          = 38400,
@@ -556,62 +571,104 @@ static usbd_respond device_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_
     return usbd_fail;
 }
 
+/**
+ * @brief Function to read data from usb RX endpoints and write to respective buffers
+ * 
+ * @param dev pointer to USB device
+ * @param ep active endpoint number
+ */
+static void comm_rxonly(usbd_device *dev, uint8_t ep){
+    rxtx_buffer *buff;
+    comm_libusb__interface_e interface;
 
-static void comm_rxonly (usbd_device *dev, uint8_t event, uint8_t ep) {
-    uint32_t dataSize = usbd_ep_read(dev, ep, rx_buffer, LU_RX_BUF_SIZE);
+    // Set receive buffer based on endpoint
+    if(ep == DEVICE_DATA_RX_EP){
+        buff = &data_ep_buffer;
+#if (ENABLE_CDC_COMM == 1)
+        interface = COMM_LIBUSB__CDC;
+#elif (ENABLE_HID_WEBUSB_COMM == 1)
+        interface = COMM_LIBUSB__HID;
+#endif
+    }else if(ep == WEBUSB_RXD_EP){
+        buff = &webusb_buffer;
+        interface = COMM_LIBUSB__WEBUSB;
+    }else{
+        return;
+    }
+ 
+    uint32_t dataSize = usbd_ep_read(dev, ep, buff->rx_buffer, LU_RX_BUF_SIZE);
 
-    parseFun(rx_buffer, dataSize);
-
+    // Call application parser
+    if(parseFun != NULL)
+        parseFun(buff->rx_buffer, dataSize, interface);
 }
 
-static void comm_txonly(usbd_device *dev, uint8_t event, uint8_t ep) {
+/**
+ * @brief Function to write data to usb TX endpoints from respective buffers
+ * 
+ * @param dev pointer to USB device
+ * @param ep active endpoint number
+ */
+static void comm_txonly(usbd_device *dev, uint8_t ep){
+    rxtx_buffer *buff = NULL;
+    uint32_t  tx_len = 0, fifo_move_len = 0;
+
+    // Set buffer based on endpoint from which data will be sent
 #if (ENABLE_HID_WEBUSB_COMM == 1)
-     uint32_t  _t = 0;
     if(ep == DEVICE_DATA_TX_EP){
-        if(fpos == 0){
-            usbd_ep_write(dev, ep, &fifo[0], fpos);
-            return;
-        }else if(fpos >= DEVICE_DATA_EP_SIZE){
-            _t = usbd_ep_write(dev, ep, &fifo[0], DEVICE_DATA_EP_SIZE);
-        }else{
-            usbd_ep_write(dev, ep, &fifo[0], DEVICE_DATA_EP_SIZE);
-            _t = fpos;
-        }     
-    }
-    else {
-        _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < DEVICE_DATA_EP_SIZE) ? fpos : DEVICE_DATA_EP_SIZE);
+        buff = &data_ep_buffer;
+    }else if(ep == WEBUSB_TXD_EP){
+        buff = &webusb_buffer;
+    }else{
+        return;
     }
 #elif (ENABLE_CDC_COMM == 1)
-    uint32_t _t = usbd_ep_write(dev, ep, &fifo[0], (fpos < DEVICE_DATA_EP_SIZE) ? fpos : DEVICE_DATA_EP_SIZE);
-#else
-    #error "No USB protocol defined select ENABLE_CDC_COMM or ENABLE_HID_WEBUSB_COMM"
+    buff = &data_ep_buffer;
 #endif
-    
-    memmove(&fifo[0], &fifo[_t], fpos - _t);
-    fpos -= _t;
+
+    /**
+     * Set data stream length to pass to TX endpoint. In some cases the length of data
+     * stream can be greater than the data present in the fifo buffer. This needs to be
+     * defined as we need to move the fifo buffer so the data already transmitted is not
+     * repeated. So lenght of data stream to move from fifo is also set based on ep and 
+     * present data size.
+     */
+    if(buff->fifo_pos >= DEVICE_DATA_EP_SIZE){
+        fifo_move_len = tx_len = DEVICE_DATA_EP_SIZE;
+    } else {
+        fifo_move_len = tx_len = buff->fifo_pos;
+#if (ENABLE_HID_WEBUSB_COMM == 1)
+        /**
+         * For HID endpoint, data size is fixed to 64 or 0, so all data streams with less than
+         * DEVICE_DATA_EP_SIZE bytes needs to be padded.
+         */
+        if(ep == DEVICE_DATA_TX_EP){
+            tx_len = (buff->fifo_pos == 0)? 0 : DEVICE_DATA_EP_SIZE;
+        }
+#endif
+    }
+
+    usbd_ep_write(dev, ep, &buff->tx_fifo[0], tx_len);
+
+    // Move the tx fifo buffer by number of bytes transmitted
+    memmove(&buff->tx_fifo[0], &buff->tx_fifo[fifo_move_len], buff->fifo_pos - fifo_move_len);
+    buff->fifo_pos -= fifo_move_len;
 }
 
+/**
+ * @brief Callback function for RX and TX endpoints.
+ * 
+ * @param dev pointer to USB device
+ * @param event @ref USB_EVENTS "USB event"
+ * @param ep active endpoint number
+ */
 static void comm_rxtx(usbd_device *dev, uint8_t event, uint8_t ep) {
     if (event == usbd_evt_eptx) {
-        comm_txonly(dev, event, ep);
-    } else {
-        comm_rxonly(dev, event, ep);
+        comm_txonly(dev, ep);
+    } else if (event == usbd_evt_eprx){
+        comm_rxonly(dev, ep);
     }
 }
-
-#if (ENABLE_HID_WEBUSB_COMM == 1)
-static void loopback_rxtx(usbd_device *dev, uint8_t event, uint8_t ep){
-    if (event == usbd_evt_eptx) {
-        uint32_t  _t = usbd_ep_write(dev, ep, data, (data_len < DEVICE_DATA_EP_SIZE) ? data_len : DEVICE_DATA_EP_SIZE);
-        memcpy(data, data + _t, data_len - _t);
-        data_len -= _t;
-    } else {
-        uint32_t dataSize = usbd_ep_read(dev, ep, data+data_len, sizeof(data));
-        data_len += dataSize;
-    }
-    return;
-}
-#endif
 
 static usbd_respond device_setconf (usbd_device *dev, uint8_t cfg) {
     switch (cfg) {
@@ -638,8 +695,8 @@ static usbd_respond device_setconf (usbd_device *dev, uint8_t cfg) {
 #if (ENABLE_HID_WEBUSB_COMM == 1)
         usbd_ep_config(dev, WEBUSB_RXD_EP, USB_EPTYPE_INTERRUPT /*| USB_EPTYPE_DBLBUF*/, DEVICE_DATA_EP_SIZE);
         usbd_ep_config(dev, WEBUSB_TXD_EP, USB_EPTYPE_INTERRUPT /*| USB_EPTYPE_DBLBUF*/, DEVICE_DATA_EP_SIZE);
-        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, loopback_rxtx);
-        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, loopback_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_RXD_EP, comm_rxtx);
+        usbd_reg_endpoint(dev, WEBUSB_TXD_EP, comm_rxtx);
         usbd_ep_write(dev, WEBUSB_TXD_EP, 0, 0);
 #endif
         return usbd_ack;
@@ -708,9 +765,28 @@ void libusb_init(void) {
 }
 #endif
 
-void lusb_write(const uint8_t *data, const uint16_t size) {
-    memcpy(fifo, data, size);
-    fpos = size;
+void lusb_write(const uint8_t *data, const uint16_t size, comm_libusb__interface_e interface) {
+    rxtx_buffer *buff = NULL;
+
+    // Set tx buffer based on interface paramter
+#if (ENABLE_CDC_COMM == 1)
+    if(interface == COMM_LIBUSB__CDC){
+        buff = &data_ep_buffer;
+    }
+#elif (ENABLE_HID_WEBUSB_COMM == 1)
+    if(interface == COMM_LIBUSB__HID){
+        buff = &data_ep_buffer;
+    }
+    else if(interface == COMM_LIBUSB__WEBUSB){
+        buff = &webusb_buffer;
+    }
+#endif
+    else{
+        return;
+    }
+
+    memcpy(buff->tx_fifo, data, size);
+    buff->fifo_pos = size;
 }
 
 void lusb_register_parserFunction(libusb_parser_fptr_t func) {

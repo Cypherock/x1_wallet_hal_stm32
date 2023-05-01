@@ -1101,11 +1101,6 @@ void BSP_App_Timer_Run(void)
 	}
 }
 
-void BSP_DebugPort_Write(uint8_t * data, uint8_t size){
-    lusb_write(data, size);
-}
-
-
 void BSP_sysClkDisable(void)
 {
 	SysTick->CTRL  = SysTick_CTRL_CLKSOURCE_Msk | SysTick_CTRL_ENABLE_Msk;
