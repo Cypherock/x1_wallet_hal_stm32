@@ -505,7 +505,7 @@ ret_code_t adafruit_pn532_passive_activation_retries_set(uint8_t max_retries)
     return STM_SUCCESS;
 }
 
-ret_code_t pn532_set_nfca_target_init_command(){
+ret_code_t pn532_set_nfca_target_init_command(void){
     m_pn532_packet_buf[0] = PN532_COMMAND_INLISTPASSIVETARGET;
     m_pn532_packet_buf[1] = 1; // Maximum number of targets.
     m_pn532_packet_buf[2] = PN532_MIFARE_ISO14443A_BAUD;
@@ -1184,7 +1184,7 @@ ret_code_t adafruit_diagnose_comm_line(uint8_t * p_send, uint8_t send_len)
     return STM_SUCCESS;
 }
 
-ret_code_t adafruit_diagnose_card_presence()
+ret_code_t adafruit_diagnose_card_presence(void)
 {
     uint8_t p_response_len = 1;
 
@@ -1232,6 +1232,7 @@ ret_code_t adafruit_diagnose_card_presence()
         return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
     }
 
+    // Return the status byte received from PN532 response.
     return m_pn532_packet_buf[PN532_DATA_OFFSET + 1];
 }
 
