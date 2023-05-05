@@ -378,8 +378,7 @@ const struct usb_bos_cap_descriptor bos_desc = {
         .bReserved              = 0x00,
         .PlatformCapabilityUUID = {0x38, 0xB6, 0x08, 0x34, 0xA9, 0x09, 0xA0, 0x47, 0x8B, 0xFD, 0xA0, 0x76, 0x88, 0x15, 0xB6, 0x65},
         .bcdVersion             = VERSION_BCD(1,0,0),
-        .bVendorCode            = USB_VENDOR_WEBUSB_REQUEST,
-        .iLandingPage           = 0x01,
+        .bVendorCode            = 0x01,
     },
     .msos2_cap = {
         .bLength                = sizeof(struct usb_MSOS2_cap_descriptor),
@@ -442,13 +441,6 @@ const struct usb_MSOS2_set_descriptors msos2_desc_set = {
                                         '8', 0x00, 'B', 0x00, '3', 0x00, 'E', 0x00, '-', 0x00, '1', 0x00, '2', 0x00, '7', 0x00, 'C', 0x00, 'A', 0x00, 
                                         '8', 0x00, 'A', 0x00, 'F', 0x00, 'F', 0x00, 'F', 0x00, '9', 0x00, 'D', 0x00, '}', 0x00, 0x00, 0x00, 0x00, 0x00}
     },
-};
-
-const struct usb_url_descriptor url_desc = {
-    .bLength            = sizeof(struct usb_url_descriptor),
-    .bDescriptorType    = 0x03,
-    .bScheme            = 0x01,
-    .URL                = {0x77, 0x65, 0x62, 0x75, 0x73, 0x62, 0x2E, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x2E, 0x69, 0x6F, 0x2F, 0x61, 0x72, 0x64, 0x75, 0x69, 0x6E, 0x6F, 0x2F, 0x64, 0x65, 0x6D, 0x6F, 0x73, 0x2F, 0x72, 0x67, 0x62},
 };
 #endif
 
@@ -541,7 +533,7 @@ static usbd_respond device_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_
         && req->wIndex == 0
         && req->bRequest == USB_STD_GET_DESCRIPTOR) {
         switch (req->wValue >> 8) {
-        case 0x0F:
+        case USB_DTYPE_BOS:
             dev->status.data_ptr = (uint8_t*)&bos_desc;
             dev->status.data_count = sizeof(bos_desc);
             return usbd_ack;
@@ -556,18 +548,6 @@ static usbd_respond device_control(usbd_device *dev, usbd_ctlreq *req, usbd_rqc_
         case 0x00:
             dev->status.data_ptr = (uint8_t*)&msos2_desc_set;
             dev->status.data_count = sizeof(msos2_desc_set);
-            return usbd_ack;
-        default:
-            return usbd_fail;
-        }
-    }
-    if (((USB_REQ_RECIPIENT | USB_REQ_TYPE) & req->bmRequestType) == (USB_REQ_STANDARD | USB_REQ_VENDOR)
-        && req->wIndex == 1
-        && req->bRequest == 0x01) {
-        switch (req->wValue) {
-        case 0x0001:
-            dev->status.data_ptr = (uint8_t*)&url_desc;
-            dev->status.data_count = sizeof(url_desc);
             return usbd_ack;
         default:
             return usbd_fail;

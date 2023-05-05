@@ -482,7 +482,6 @@ struct usb_webusb_cap_descriptor {
     uint8_t  PlatformCapabilityUUID[16];    /**<\brief WebUSB platform capability descriptor GUID in little-endian format.*/
     uint16_t bcdVersion;                    /**<\brief WebUSB descriptor version.*/
     uint8_t  bVendorCode;                   /**<\brief bRequest value for WebUSB.*/
-    uint8_t  iLandingPage;                  /**<\brief URL for landing page.*/
 } __attribute__((packed));
 
 /**\brief USB Capability descriptor
@@ -546,13 +545,6 @@ struct usb_MSOS2_reg_prop_descriptor{
     uint8_t   PropertyName[42];             /**<\brief Property name with null terminator encoded in UTF-16LE.*/
     uint16_t  wPropertyDataLength;          /**<\brief Length of the property value.*/
     uint8_t   PropertyData[80];             /**<\brief GUID plus two null terminators encoded in UTF-16LE.*/
-} __attribute__((packed));
-
-struct usb_url_descriptor{
-    uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
-    uint8_t  bDescriptorType;               /**<\brief Debug descriptor type.*/
-    uint8_t  bScheme;                    /**<\brief WebUSB descriptor version.*/
-    uint8_t  URL[34];                    /**<\brief WebUSB descriptor version.*/
 } __attribute__((packed));
 
 /** @} */
