@@ -18,13 +18,16 @@
 #include <string.h>
 #include "stm32.h"
 #include "usb.h"
+#if (ENABLE_CDC_COMM == 1)
 #include "usb_cdc.h"
+#elif (ENABLE_HID_WEBUSB_COMM == 1)
 #include "usb_hid.h"
+#endif
 #include "sdk_config.h"
 #include "libusb.h"
 
 #define DEVICE_DATA_EP_SIZE   0x40
-#define CDC_EP0_SIZE    0x08
+#define USB_EP0_SIZE    0x08
 
 #if (ENABLE_CDC_COMM == 1)
 #define CDC_RXD_EP      0x01
@@ -116,7 +119,7 @@ static const struct usb_device_descriptor device_desc = {
     .bDeviceClass       = USB_CLASS_IAD,
     .bDeviceSubClass    = USB_SUBCLASS_IAD,
     .bDeviceProtocol    = USB_PROTO_IAD,
-    .bMaxPacketSize0    = CDC_EP0_SIZE,
+    .bMaxPacketSize0    = USB_EP0_SIZE,
     .idVendor           = BSP_USB_VID,
     .idProduct          = BSP_USB_PID,
     .bcdDevice          = VERSION_BCD(2,0,0),
@@ -697,7 +700,7 @@ static usbd_respond device_setconf (usbd_device *dev, uint8_t cfg) {
 }
 
 void usb_device_config_init(void) {
-    usbd_init(&libusb_udev, &usbd_hw, 8, ubuf, sizeof(ubuf));
+    usbd_init(&libusb_udev, &usbd_hw, USB_EP0_SIZE, ubuf, sizeof(ubuf));
     usbd_reg_config(&libusb_udev, device_setconf);
     usbd_reg_control(&libusb_udev, device_control);
     usbd_reg_descr(&libusb_udev, device_getdesc);
