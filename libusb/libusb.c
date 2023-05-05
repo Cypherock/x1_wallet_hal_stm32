@@ -18,9 +18,8 @@
 #include <string.h>
 #include "stm32.h"
 #include "usb.h"
-#if (ENABLE_CDC_COMM == 1)
 #include "usb_cdc.h"
-#elif (ENABLE_HID_WEBUSB_COMM == 1)
+#if (ENABLE_HID_WEBUSB_COMM == 1)
 #include "usb_hid.h"
 #endif
 #include "sdk_config.h"
