@@ -126,6 +126,8 @@ extern "C" {
 #define USB_DTYPE_OTG               0x09    /**<\brief OTG descriptor.*/
 #define USB_DTYPE_DEBUG             0x0A    /**<\brief Debug descriptor.*/
 #define USB_DTYPE_INTERFASEASSOC    0x0B    /**<\brief Interface association descriptor.*/
+#define USB_DTYPE_BOS               0x0F    /**<\brief BOS(Binary device Object Store) descriptor.*/
+#define USB_DTYPE_CAPABILITY        0x10    /**<\brief USB capability descriptor.*/
 #define USB_DTYPE_CS_INTERFACE      0x24    /**<\brief Class specific interface descriptor.*/
 #define USB_DTYPE_CS_ENDPOINT       0x25    /**<\brief Class specific endpoint descriptor.*/
 /** @} */
@@ -450,6 +452,99 @@ struct usb_debug_descriptor {
     uint8_t  bDescriptorType;       /**<\brief Debug descriptor type.*/
     uint8_t  bDebugInEndpoint;      /**<\brief Endpoint number of the Debug Data IN endpoint.*/
     uint8_t  bDebugOutEndpoint;     /**<\brief Endpoint number of the Debug Data OUTendpoint.*/
+} __attribute__((packed));
+
+/**\brief USB BOS descriptor
+ * \details The BOS descriptor (Binary device Object Store) defines a root descriptor
+ * that is similar to configuration descriptor, and is the base descriptor for accessing a family of
+ * related descriptors. A host can read a BOS descriptor and learn from the wTotalLength field the entire
+ * size of the device-level descriptor set, or it can read in the entire BOS descriptor set of device
+ * capabilities. The host accesses this descriptor using the GetDescriptor() request. The descriptor 
+ * type in the GetDescriptor() request is set to BOS.
+ * endpoint number.*/
+struct usb_bos_descriptor {
+    uint8_t  bLength;           /**<\brief Size of the descriptor, in bytes.*/
+    uint8_t  bDescriptorType;   /**<\brief BOS descriptor type.*/
+    uint16_t wTotalLenght;      /**<\brief Length of this descriptor and all of its sub descriptors.*/
+    uint8_t  bNumDeviceCaps;    /**<\brief The number of separate device capability descriptors in the BOS.*/
+} __attribute__((packed));
+
+/**\brief USB Capability descriptor
+ * \details Individual, technology-specific or generic device-level capabilities are reported via Device 
+ * Capability descriptors. The Device Capability descriptor has a generic header, with a sub-type field
+ * (bDevCapabilityType) which defines the layout of the remainder of the descriptor.
+ * endpoint number.*/
+struct usb_webusb_cap_descriptor {
+    uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
+    uint8_t  bDescriptorType;               /**<\brief Capability descriptor type.*/
+    uint8_t  bDevCapabilityType;            /**<\brief Endpoint number of the Debug Data IN endpoint.*/
+    uint8_t  bReserved;                     /**<\brief Endpoint number of the Debug Data OUTendpoint.*/
+    uint8_t  PlatformCapabilityUUID[16];    /**<\brief WebUSB platform capability descriptor GUID in little-endian format.*/
+    uint16_t bcdVersion;                    /**<\brief WebUSB descriptor version.*/
+    uint8_t  bVendorCode;                   /**<\brief bRequest value for WebUSB.*/
+} __attribute__((packed));
+
+/**\brief USB Capability descriptor
+ * \details Individual, technology-specific or generic device-level capabilities are reported via Device 
+ * Capability descriptors. The Device Capability descriptor has a generic header, with a sub-type field
+ * (bDevCapabilityType) which defines the layout of the remainder of the descriptor.
+ * endpoint number.*/
+struct usb_MSOS2_cap_descriptor {
+    uint8_t  bLength;                       /**<\brief Size of the descriptor, in bytes.*/
+    uint8_t  bDescriptorType;               /**<\brief Capability descriptor type.*/
+    uint8_t  bDevCapabilityType;            /**<\brief Endpoint number of the Debug Data IN endpoint.*/
+    uint8_t  bReserved;                     /**<\brief Endpoint number of the Debug Data OUTendpoint.*/
+    uint8_t  PlatformCapabilityUUID[16];    /**<\brief WebUSB platform capability descriptor GUID in little-endian format.*/
+    uint32_t dwWindowsVersion;                    /**<\brief WebUSB descriptor version.*/
+    uint16_t wMSOSDescriptorSetTotalLength;                   /**<\brief bRequest value for WebUSB.*/
+    uint8_t  bMS_VendorCode;                  /**<\brief URL for landing page.*/
+    uint8_t  bAltEnumCode;
+} __attribute__((packed));
+
+
+/**\brief Microsoft OS 2.0 descriptor set header */
+struct usb_MSOS2_desc_set_header_descriptor {
+    uint16_t  wLength;                       /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;               /**<\brief Descriptor set header descriptor.*/
+    uint32_t  dwWindowsVersion;              /**<\brief Minimum compatible Windows version (Windows 8.1).*/
+    uint16_t  wTotalLenght;                  /**<\brief Total length of the descriptor set.*/
+} __attribute__((packed));
+
+/**\brief Microsoft OS 2.0 function subset header*/
+struct usb_MSOS2_conf_subset_header_descriptor {
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Configuration subset header desc.*/
+    uint8_t   bConfigurationValue;          /**<\brief Applies to configuration 1 (indexed from 0 despite configurations normally indexed from 1).*/
+    uint8_t   bReserved;                    /**<\brief Must be set to 0.*/
+    uint16_t  wTotalLenght;                 /**<\brief Total length of the subset including this header.*/
+} __attribute__((packed));
+
+/**\brief Microsoft OS 2.0 function subset header*/
+struct usb_MSOS2_func_subset_header_descriptor {
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Function subset header descriptor.*/
+    uint8_t   bFirstInterface;              /**<\brief First interface of the function.*/
+    uint8_t   bReserved;                    /**<\brief Must be set to 0.*/
+    uint16_t  wSubsetLenght;                /**<\brief 	Total length of the subset including this header.*/
+} __attribute__((packed));
+
+/**\brief Microsoft OS 2.0 compatible ID descriptor*/
+struct usb_MSOS2_comp_id_descriptor{
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Compatible ID descriptor.*/
+    uint8_t   CompatibleID[8];              /**<\brief ASCII string padded to 8 bytes.*/
+    uint8_t   SubCompatibleID[8];           /**<\brief ASCII string padded to 8 bytes.*/
+} __attribute__((packed));
+
+/**\brief Microsoft OS 2.0 registry property descriptor*/
+struct usb_MSOS2_reg_prop_descriptor{
+    uint16_t  wLength;                      /**<\brief Size of the descriptor, in bytes.*/
+    uint16_t  wDescriptorType;              /**<\brief Registry property descriptor.*/
+    uint16_t  wPropertyDataType;            /**<\brief REG_MULTI_SZ.*/
+    uint16_t  wPropertyNameLength;          /**<\brief Length of the property name.*/
+    uint8_t   PropertyName[42];             /**<\brief Property name with null terminator encoded in UTF-16LE.*/
+    uint16_t  wPropertyDataLength;          /**<\brief Length of the property value.*/
+    uint8_t   PropertyData[80];             /**<\brief GUID plus two null terminators encoded in UTF-16LE.*/
 } __attribute__((packed));
 
 /** @} */
