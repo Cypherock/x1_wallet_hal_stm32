@@ -247,6 +247,7 @@ struct usb_cdc_line_coding {
     uint8_t     bCharFormat;        /**<\brief Stop bits.*/
     uint8_t     bParityType;        /**<\brief Parity.*/
     uint8_t     bDataBits;          /**<\brief Data bits (5,6,7,8 or 16).*/
+    uint8_t     blineState;
 } __attribute__ ((packed));
 
 /** @} */
