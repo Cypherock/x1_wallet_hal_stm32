@@ -45,7 +45,6 @@ void invert_key_pad();
 void lv_port_indev_init(void);
 uint32_t keypad_get_key(void);
 extern lv_indev_t* indev_keypad;
-extern bool nfc_tapped;
 
 #ifdef DEV_BUILD
 void ekp_register_process_func(ekp_process_queue_fptr func);
