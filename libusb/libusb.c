@@ -643,7 +643,8 @@ static void comm_txonly(usbd_device *dev, uint8_t ep){
 
     usbd_ep_write(dev, ep, &buff->tx_fifo[0], tx_len);
 
-    // Move the tx fifo buffer by number of bytes transmitted
+    // Clear and Move the tx fifo buffer by number of bytes transmitted
+    memset(&buff->tx_fifo[0], 0, fifo_move_len);
     memmove(&buff->tx_fifo[0], &buff->tx_fifo[fifo_move_len], buff->fifo_pos - fifo_move_len);
     buff->fifo_pos -= fifo_move_len;
 }
