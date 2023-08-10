@@ -637,15 +637,14 @@ static void comm_txonly(usbd_device *dev, uint8_t ep){
          */
         if(ep == DEVICE_DATA_TX_EP){
             tx_len = (buff->fifo_pos == 0)? 0 : DEVICE_DATA_EP_SIZE;
-            // TODO: Fix logic for adding hid packet padding
-            memset(buff->tx_fifo + buff->fifo_pos, 0, DEVICE_DATA_EP_SIZE - buff->fifo_pos);
         }
 #endif
     }
 
     usbd_ep_write(dev, ep, &buff->tx_fifo[0], tx_len);
 
-    // Move the tx fifo buffer by number of bytes transmitted
+    // Clear and Move the tx fifo buffer by number of bytes transmitted
+    memset(&buff->tx_fifo[0], 0, fifo_move_len);
     memmove(&buff->tx_fifo[0], &buff->tx_fifo[fifo_move_len], buff->fifo_pos - fifo_move_len);
     buff->fifo_pos -= fifo_move_len;
 }
