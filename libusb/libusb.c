@@ -181,9 +181,13 @@ static const struct cdc_config config_desc = {
     },
 };
 
+#ifndef VENDOR_NAME
+#define VENDOR_NAME "CYPHEROCK X1 WALLET"
+#endif
+
 static const struct usb_string_descriptor lang_desc     = USB_ARRAY_DESC(USB_LANGID_ENG_US);
 static const struct usb_string_descriptor manuf_desc_en = USB_STRING_DESC("HODL TECH PTE LTD");
-static const struct usb_string_descriptor prod_desc_en  = USB_STRING_DESC("CYPHEROCK X1 WALLET");
+static const struct usb_string_descriptor prod_desc_en  = USB_STRING_DESC(VENDOR_NAME);
 static const struct usb_string_descriptor *const dtable[] = {
     &lang_desc,
     &manuf_desc_en,
